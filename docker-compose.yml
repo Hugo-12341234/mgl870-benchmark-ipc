@@ -8,3 +8,44 @@ services:
       - "50051:50051"
     cpus: "1.0"
     mem_limit: 512m
+    networks:
+      - benchmark
+
+  cadvisor:
+    image: google/cadvisor:latest
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks:
+      - benchmark
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - cadvisor
+    networks:
+      - benchmark
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - benchmark
+
+networks:
+  benchmark:
+    name: mgl870-benchmark
+
+volumes:
+  grafana-data:
