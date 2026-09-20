@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package tick;
+
+message TickMessage {
+  string symbol = 1;
+  double price = 2;
+  uint32 volume = 3;
+  uint64 timestamp = 4;
+}
+
+message Ack {}
+
+service TickIngestion {
+  rpc IngestTick(TickMessage) returns (Ack);
+}
