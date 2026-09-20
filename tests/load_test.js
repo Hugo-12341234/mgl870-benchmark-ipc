@@ -1,8 +1,6 @@
 import http from "k6/http";
 import { check } from "k6";
 
-const baseUrl = __ENV.BASE_URL || "http://localhost:8080";
-const protocol = (__ENV.PROTOCOL || "rest").toLowerCase();
 const tick = {
   symbol: "SHOP",
   price: 115.42,
@@ -10,13 +8,29 @@ const tick = {
   timestamp: 1700000000,
 };
 
+const jsonHeaders = { "Content-Type": "application/json" };
+
 export const options = {
-  stages: [
-    { duration: "30s", target: 100 },
-    { duration: "30s", target: 500 },
-    { duration: "1m", target: 500 },
-    { duration: "30s", target: 0 },
-  ],
+  scenarios: {
+    rest: {
+      executor: "constant-vus",
+      vus: 500,
+      duration: "2m",
+      exec: "rest",
+    },
+    graphql: {
+      executor: "constant-vus",
+      vus: 500,
+      duration: "2m",
+      exec: "graphql",
+    },
+    jsonrpc: {
+      executor: "constant-vus",
+      vus: 500,
+      duration: "2m",
+      exec: "jsonrpc",
+    },
+  },
   thresholds: {
     http_req_duration: ["p(95)<1000", "p(99)<2000"],
     http_req_failed: ["rate<0.01"],
@@ -24,44 +38,36 @@ export const options = {
 };
 
 function post(url, body) {
-  return http.post(url, body, {
-    headers: { "Content-Type": "application/json" },
-  });
+  return http.post(url, JSON.stringify(body), { headers: jsonHeaders });
 }
 
-export default function () {
-  let response;
-
-  switch (protocol) {
-    case "rest":
-      response = post(`${baseUrl}/api/ticks`, JSON.stringify(tick));
-      break;
-    case "graphql":
-      response = post(
-        `${baseUrl}/graphql`,
-        JSON.stringify({
-          query:
-            "mutation IngestTick($tick: TickInput!) { ingest_tick(tick: $tick) }",
-          variables: { tick },
-        }),
-      );
-      break;
-    case "jsonrpc":
-      response = post(
-        `${baseUrl}/jsonrpc`,
-        JSON.stringify({
-          jsonrpc: "2.0",
-          method: "ingest_tick",
-          params: tick,
-          id: __VU * 1000000 + __ITER,
-        }),
-      );
-      break;
-    default:
-      throw new Error(`Unsupported PROTOCOL: ${protocol}`);
-  }
-
+export function rest() {
+  const response = post("http://localhost:8081/api/ticks", tick);
   check(response, {
-    "status is 200": (result) => result.status === 200,
+    "REST status is 200": (result) => result.status === 200,
   });
 }
+
+export function graphql() {
+  const response = post("http://localhost:8082/graphql", {
+    query: "mutation IngestTick($tick: TickInput!) { ingestTick(tick: $tick) }",
+    variables: { tick },
+  });
+  check(response, {
+    "GraphQL status is 200": (result) => result.status === 200,
+  });
+}
+
+export function jsonrpc() {
+  const response = post("http://localhost:8083/jsonrpc", {
+    jsonrpc: "2.0",
+    method: "ingest_tick",
+    params: tick,
+    id: __VU * 1000000 + __ITER,
+  });
+  check(response, {
+    "JSON-RPC status is 200": (result) => result.status === 200,
+  });
+}
+
+export default function () {}
