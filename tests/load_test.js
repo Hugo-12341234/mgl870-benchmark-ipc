@@ -37,37 +37,53 @@ export const options = {
   },
 };
 
-function post(url, body) {
-  return http.post(url, JSON.stringify(body), { headers: jsonHeaders });
+function post(url, body, protocol) {
+  return http.post(url, JSON.stringify(body), {
+    headers: jsonHeaders,
+    tags: { protocol },
+  });
 }
 
 export function rest() {
-  const response = post("http://localhost:8081/api/ticks", tick);
+  const response = post("http://localhost:8081/api/ticks", tick, "rest");
   check(response, {
     "REST status is 200": (result) => result.status === 200,
   });
 }
 
 export function graphql() {
-  const response = post("http://localhost:8082/graphql", {
-    query: "mutation IngestTick($tick: TickInput!) { ingestTick(tick: $tick) }",
-    variables: { tick },
-  });
+  const response = post(
+    "http://localhost:8082/graphql",
+    {
+      query:
+        "mutation IngestTick($tick: TickInput!) { ingestTick(tick: $tick) }",
+      variables: { tick },
+    },
+    "graphql",
+  );
   check(response, {
     "GraphQL status is 200": (result) => result.status === 200,
   });
 }
 
 export function jsonrpc() {
-  const response = post("http://localhost:8083/jsonrpc", {
-    jsonrpc: "2.0",
-    method: "ingest_tick",
-    params: tick,
-    id: __VU * 1000000 + __ITER,
-  });
+  const response = post(
+    "http://localhost:8083/jsonrpc",
+    {
+      jsonrpc: "2.0",
+      method: "ingest_tick",
+      params: tick,
+      id: __VU * 1000000 + __ITER,
+    },
+    "jsonrpc",
+  );
   check(response, {
     "JSON-RPC status is 200": (result) => result.status === 200,
   });
 }
 
 export default function () {}
+
+export function handleSummary(data) {
+  return { "k6_results.json": JSON.stringify(data, null, 2) };
+}
