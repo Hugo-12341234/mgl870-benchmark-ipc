@@ -57,13 +57,26 @@ services:
 
   cadvisor:
     image: google/cadvisor:latest
+    command:
+      - "--docker_only=true"
+      - "--housekeeping_interval=5s"
     privileged: true
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
+    networks:
+      - benchmark
+
+  docker-metrics:
+    build:
+      context: ./observability
+      dockerfile: Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - benchmark
 
@@ -71,13 +84,14 @@ services:
     image: prom/prometheus:latest
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--enable-feature=remote-write-receiver"
+      - "--web.enable-remote-write-receiver"
       - "--storage.tsdb.retention.time=24h"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     depends_on:
       - cadvisor
+      - docker-metrics
     networks:
       - benchmark
 
@@ -107,6 +121,7 @@ services:
     environment:
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "false"
+      K6_PROMETHEUS_RW_TREND_STATS: "p(50),p(95),p(99)"
       REST_URL: http://server-rest:8080/api/ticks
       GRAPHQL_URL: http://server-graphql:8080/graphql
       JSONRPC_URL: http://server-jsonrpc:8080/jsonrpc

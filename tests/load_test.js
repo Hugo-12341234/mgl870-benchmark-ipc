@@ -125,7 +125,7 @@ export function grpc() {
       grpcClient.connect(grpcAddress, { plaintext: true });
       grpcState.connected = true;
     }
-    const response = grpcClient.invoke("tick.TickIngestion.IngestTick", tick);
+    const response = grpcClient.invoke("tick.TickIngestion/IngestTick", tick);
     success = response && response.status === grpcModule.StatusOK;
   } catch (_) {
     success = false;
