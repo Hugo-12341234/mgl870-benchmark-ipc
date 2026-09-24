@@ -69,8 +69,13 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--enable-feature=remote-write-receiver"
+      - "--storage.tsdb.retention.time=24h"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
     depends_on:
       - cadvisor
     networks:
@@ -89,9 +94,41 @@ services:
     networks:
       - benchmark
 
+  k6:
+    image: grafana/k6:latest
+    profiles:
+      - loadtest
+    working_dir: /results
+    command:
+      - run
+      - -o
+      - experimental-prometheus-rw
+      - /scripts/load_test.js
+    environment:
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: "false"
+      REST_URL: http://server-rest:8080/api/ticks
+      GRAPHQL_URL: http://server-graphql:8080/graphql
+      JSONRPC_URL: http://server-jsonrpc:8080/jsonrpc
+      GRPC_ADDRESS: server-grpc:50051
+      GRPC_PROTO_DIR: /proto
+    volumes:
+      - ./tests:/scripts:ro
+      - ./proto:/proto:ro
+      - ./results:/results
+    depends_on:
+      - server-rest
+      - server-graphql
+      - server-jsonrpc
+      - server-grpc
+      - prometheus
+    networks:
+      - benchmark
+
 networks:
   benchmark:
     name: mgl870-benchmark
 
 volumes:
   grafana-data:
+  prometheus-data:
