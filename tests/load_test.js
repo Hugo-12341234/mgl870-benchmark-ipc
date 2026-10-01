@@ -26,10 +26,9 @@ const errors = new Counter("protocol_errors");
 const errorRate = new Rate("protocol_error_rate");
 
 const rateStages = [
-  { target: 100, duration: "30s" },
-  { target: 250, duration: "30s" },
-  { target: 500, duration: "30s" },
-  { target: 500, duration: "30s" },
+  { target: 10000, duration: "2m" },
+  { target: 30000, duration: "2m" },
+  { target: 30000, duration: "3m" },
 ];
 
 function scenario(protocol, exec) {
@@ -38,8 +37,8 @@ function scenario(protocol, exec) {
     startRate: 0,
     timeUnit: "1s",
     stages: rateStages,
-    preAllocatedVUs: 500,
-    maxVUs: 2000,
+    preAllocatedVUs: 2500,
+    maxVUs: 15000,
     exec,
     tags: { protocol },
   };
