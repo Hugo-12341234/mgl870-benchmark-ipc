@@ -11,6 +11,11 @@ message TickMessage {
 
 message Ack {}
 
+message TickList {
+  repeated TickMessage ticks = 1;
+}
+
 service TickIngestion {
   rpc IngestTick(TickMessage) returns (Ack);
+  rpc IngestTickBatch(TickList) returns (Ack);
 }

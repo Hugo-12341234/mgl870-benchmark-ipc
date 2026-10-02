@@ -3,7 +3,7 @@ pub mod tick {
 }
 
 use tick::tick_ingestion_server::{TickIngestion, TickIngestionServer};
-use tick::{Ack, TickMessage};
+use tick::{Ack, TickList, TickMessage};
 use tonic::{Request, Response, Status};
 
 struct TickIngestionService;
@@ -13,6 +13,13 @@ impl TickIngestion for TickIngestionService {
     async fn ingest_tick(
         &self,
         _request: Request<TickMessage>,
+    ) -> Result<Response<Ack>, Status> {
+        Ok(Response::new(Ack {}))
+    }
+
+    async fn ingest_tick_batch(
+        &self,
+        _request: Request<TickList>,
     ) -> Result<Response<Ack>, Status> {
         Ok(Response::new(Ack {}))
     }

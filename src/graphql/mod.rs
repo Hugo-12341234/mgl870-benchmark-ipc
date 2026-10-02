@@ -26,6 +26,11 @@ impl Mutation {
         let _ = tick;
         true
     }
+
+    async fn ingest_tick_batch(&self, ticks: Vec<TickInput>) -> bool {
+        let _ = ticks;
+        true
+    }
 }
 
 type TickSchema = Schema<Query, Mutation, EmptySubscription>;

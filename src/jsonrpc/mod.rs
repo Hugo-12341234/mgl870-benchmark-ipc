@@ -9,6 +9,9 @@ use crate::models::Tick;
 pub trait TickRpc {
     #[method(name = "ingest_tick")]
     async fn ingest_tick(&self, tick: Tick) -> bool;
+
+    #[method(name = "ingest_tick_batch")]
+    async fn ingest_tick_batch(&self, ticks: Vec<Tick>) -> bool;
 }
 
 pub struct TickRpcImpl;
@@ -16,6 +19,10 @@ pub struct TickRpcImpl;
 #[async_trait::async_trait]
 impl TickRpcServer for TickRpcImpl {
     async fn ingest_tick(&self, _tick: Tick) -> bool {
+        true
+    }
+
+    async fn ingest_tick_batch(&self, _ticks: Vec<Tick>) -> bool {
         true
     }
 }
@@ -41,6 +48,9 @@ pub fn router() -> Router {
 
 async fn jsonrpc_handler(Json(request): Json<JsonRpcRequest>) -> (StatusCode, Json<Value>) {
     if request.jsonrpc != "2.0" || request.method != "ingest_tick" {
+        if request.jsonrpc == "2.0" && request.method == "ingest_tick_batch" {
+            return handle_batch_request(request).await;
+        }
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"jsonrpc": "2.0", "error": "invalid request"})),
@@ -66,6 +76,35 @@ async fn jsonrpc_handler(Json(request): Json<JsonRpcRequest>) -> (StatusCode, Js
 
     let result = TickRpcServer::ingest_tick(&TickRpcImpl, tick).await;
 
+    let response = JsonRpcResponse {
+        jsonrpc: "2.0",
+        result,
+        id: request.id,
+    };
+    (StatusCode::OK, Json(json!(response)))
+}
+
+async fn handle_batch_request(
+    request: JsonRpcRequest,
+) -> (StatusCode, Json<Value>) {
+    let Some(params) = request.params else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"jsonrpc": "2.0", "error": "missing params"})),
+        );
+    };
+
+    let ticks = match serde_json::from_value::<Vec<Tick>>(params) {
+        Ok(ticks) => ticks,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"jsonrpc": "2.0", "error": "invalid params"})),
+            );
+        }
+    };
+
+    let result = TickRpcServer::ingest_tick_batch(&TickRpcImpl, ticks).await;
     let response = JsonRpcResponse {
         jsonrpc: "2.0",
         result,

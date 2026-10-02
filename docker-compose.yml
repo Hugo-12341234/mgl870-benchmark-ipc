@@ -125,6 +125,9 @@ services:
       REST_URL: http://server-rest:8080/api/ticks
       GRAPHQL_URL: http://server-graphql:8080/graphql
       JSONRPC_URL: http://server-jsonrpc:8080/jsonrpc
+      BATCH_REST_URL: http://server-rest:8080/api/ticks/batch
+      BATCH_GRAPHQL_URL: http://server-graphql:8080/graphql
+      BATCH_JSONRPC_URL: http://server-jsonrpc:8080/jsonrpc
       GRPC_ADDRESS: server-grpc:50051
       GRPC_PROTO_DIR: /proto
     volumes:
