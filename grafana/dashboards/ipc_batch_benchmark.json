@@ -1,0 +1,104 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "rate(docker_container_cpu_usage_seconds_total{container_label_com_docker_compose_service=~\"server-.*\"}[1m])", "legendFormat": "{{container_label_com_docker_compose_service}}", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "docker_container_memory_usage_bytes{container_label_com_docker_compose_service=~\"server-.*\"}", "legendFormat": "{{container_label_com_docker_compose_service}}", "refId": "A" }]
+    },
+    {
+      "id": 3,
+      "title": "Network Transmit",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "Bps", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "rate(docker_container_network_transmit_bytes_total{container_label_com_docker_compose_service=~\"server-.*\"}[1m])", "legendFormat": "{{container_label_com_docker_compose_service}}", "refId": "A" }]
+    },
+    {
+      "id": 4,
+      "title": "Network Receive",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "Bps", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "rate(docker_container_network_receive_bytes_total{container_label_com_docker_compose_service=~\"server-.*\"}[1m])", "legendFormat": "{{container_label_com_docker_compose_service}}", "refId": "A" }]
+    },
+    {
+      "id": 5,
+      "title": "Batch Latency p50",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p50)", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "title": "Batch Latency p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p95)", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 7,
+      "title": "Batch Latency p99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p99)", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 8,
+      "title": "Batch Requests per Second",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "sum by (protocol) (rate(k6_batch_protocol_requests_total[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 9,
+      "title": "Batch Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_error_rate_rate)", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 10,
+      "title": "Batch Ticks per Second",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "500 * sum by (protocol) (rate(k6_batch_protocol_requests_total[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "title": "IPC Batch Benchmark",
+  "uid": "ipc-batch-benchmark",
+  "version": 1
+}
