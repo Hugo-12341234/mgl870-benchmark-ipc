@@ -1,48 +1,105 @@
-@startuml
+@startuml "MGL870 - Vue Déploiement"
 !theme plain
-skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
 skinparam shadowing false
+skinparam artifactStyle rectangle
+skinparam packageStyle rectangle
+skinparam ArrowThickness 2
+skinparam defaultTextAlignment center
 skinparam defaultFontName Arial
-skinparam ArrowColor #34495E
-skinparam ComponentBorderColor #34495E
-skinparam ComponentBackgroundColor #F7F9FB
-skinparam PackageBorderColor #7F8C8D
-skinparam PackageBackgroundColor #FFFFFF
 
-actor "Générateur de charge\nk6" as k6
+title "MGL870 — Diagramme de Déploiement du Banc d’Essai"
 
-package "Environnement Docker" {
-  package "Services évalués\n0,25 vCPU chacun" {
-    component "REST\nHTTP/1.1 + JSON" as rest
-    component "GraphQL\nHTTP/1.1 + JSON" as graphql
-    component "JSON-RPC\nHTTP/1.1 + JSON" as jsonrpc
-    component "gRPC\nHTTP/2 + Protobuf" as grpc
+' ========== LOAD GENERATION LAYER ==========
+node "Générateur de charge" as LoadGenerator {
+  node "Conteneur: k6-single\n(k6)" as K6Single {
+    artifact "load_test.js"
   }
-
-  component "Prometheus" as prometheus
-  component "cAdvisor /\ndocker-metrics" as metrics
-  component "Grafana" as grafana
+  node "Conteneur: k6-batch\n(k6)" as K6Batch {
+    artifact "load_test_batch.js"
+  }
 }
 
-k6 --> rest : POST /api/ticks\nPOST /api/ticks/batch
-k6 --> graphql : POST /graphql
-k6 --> jsonrpc : POST /jsonrpc
-k6 --> grpc : IngestTick\nIngestTickBatch
+node "Docker Host" as Docker {
+  package "mgl870-benchmark" as Network {
 
-metrics ..> rest : CPU / mémoire
-metrics ..> graphql : CPU / mémoire
-metrics ..> jsonrpc : CPU / mémoire
-metrics ..> grpc : CPU / mémoire
-metrics --> prometheus : métriques
-k6 --> prometheus : latence / débit / erreurs
-prometheus --> grafana : requêtes PromQL
+    ' ========== SERVICE LAYER ==========
+    package "Services évalués" as ServiceLayer #LightBlue {
+      node "Conteneur: server-rest\nRust / Axum\n0,25 vCPU, 512 MiB" as RestC {
+        artifact "REST\nHTTP/1.1 + JSON"
+      }
 
-note right of rest
-Même modèle Tick :
-symbol, price, volume,
-timestamp.
-Réponse de succès après
-désérialisation.
-end note
+      node "Conteneur: server-graphql\nRust / async-graphql\n0,25 vCPU, 512 MiB" as GraphQLC {
+        artifact "GraphQL\nHTTP/1.1 + JSON"
+      }
+
+      node "Conteneur: server-jsonrpc\nRust / jsonrpsee\n0,25 vCPU, 512 MiB" as JsonRpcC {
+        artifact "JSON-RPC\nHTTP/1.1 + JSON"
+      }
+
+      node "Conteneur: server-grpc\nRust / tonic\n0,25 vCPU, 512 MiB" as GrpcC {
+        artifact "gRPC\nHTTP/2 + Protobuf"
+      }
+    }
+
+    ' ========== OBSERVABILITY LAYER ==========
+    package "Monitoring et observabilité" as MonitoringLayer #LightYellow {
+      node "Conteneur: prometheus\nPrometheus" as PrometheusC {
+        artifact "prometheus.yml"
+      }
+
+      node "Conteneur: cadvisor\ncAdvisor" as CAdvisorC {
+        artifact "Métriques Docker"
+      }
+
+      node "Conteneur: docker-metrics\nPython" as DockerMetricsC {
+        artifact "docker_metrics.py"
+      }
+
+      node "Conteneur: grafana\nGrafana" as GrafanaC {
+        artifact "Dashboards JSON"
+      }
+    }
+  }
+}
+
+' ========== LOAD FLOWS ==========
+K6Single --> RestC : HTTP POST\n/api/ticks
+K6Single --> GraphQLC : HTTP POST\n/graphql
+K6Single --> JsonRpcC : HTTP POST\n/jsonrpc
+K6Single --> GrpcC : gRPC\nIngestTick
+
+K6Batch --> RestC : HTTP POST\n/api/ticks/batch
+K6Batch --> GraphQLC : HTTP POST\ningestTickBatch
+K6Batch --> JsonRpcC : HTTP POST\ningest_tick_batch
+K6Batch --> GrpcC : gRPC\nIngestTickBatch
+
+' ========== METRICS FLOWS ==========
+CAdvisorC --> PrometheusC : Scrape CPU / mémoire
+DockerMetricsC --> PrometheusC : Métriques conteneurs
+K6Single --> PrometheusC : Remote write\nlatence / débit / erreurs
+K6Batch --> PrometheusC : Remote write\nlatence / débit / erreurs
+PrometheusC --> GrafanaC : PromQL / dashboards
+
+' ========== LAYOUT HINTS ==========
+LoadGenerator -[hidden]down-> Docker
+ServiceLayer -[hidden]down-> MonitoringLayer
+K6Single -[hidden]down-> K6Batch
+RestC -[hidden]right-> GraphQLC
+GraphQLC -[hidden]right-> JsonRpcC
+JsonRpcC -[hidden]right-> GrpcC
+
+legend right
+Générateur de charge : deux scénarios k6,
+micro-message unitaire et lot de 500 ticks.
+Services évalués : quatre conteneurs construits
+depuis le même projet Rust et limités à 0,25 vCPU.
+REST, GraphQL et JSON-RPC utilisent HTTP/1.1 + JSON.
+gRPC utilise HTTP/2 + Protocol Buffers.
+Observabilité : Prometheus collecte les métriques,
+cAdvisor et docker-metrics observent les conteneurs,
+Grafana affiche les dashboards expérimentaux.
+end legend
 
 @enduml

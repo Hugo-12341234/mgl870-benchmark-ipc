@@ -159,7 +159,7 @@ Les signatures des opérations sont alignées autant que le permettent les modè
 
 Le déploiement comprend quatre services évalués, un générateur de charge k6 pour les scénarios, Prometheus pour la collecte des métriques, cAdvisor et un composant de métriques Docker pour l’observation des conteneurs, ainsi que Grafana pour l’exploration visuelle. Chaque serveur dispose d’une limite de `0,25` vCPU et de 512 MiB de mémoire. La limite CPU est commune aux variantes et représente une contrainte volontairement stricte : elle augmente la probabilité que le coût de parsing, de sérialisation ou de traitement du transport apparaisse dans les mesures.
 
-Le générateur k6 enregistre la durée des requêtes, le nombre de requêtes, les erreurs et le taux d’erreur avec des métriques séparées par protocole. Les métriques système permettent de relier ces mesures applicatives à l’utilisation des conteneurs. La figure suivante documente les composants et les flux principaux du dispositif. Le fichier source PlantUML versionné est disponible dans [`docs/figures/architecture.puml`](figures/architecture.puml).
+Le générateur k6 enregistre la durée des requêtes, le nombre de requêtes, les erreurs et le taux d’erreur avec des métriques séparées par protocole. Les métriques système permettent de relier ces mesures applicatives à l’utilisation des conteneurs. Le diagramme de déploiement documente l’organisation du banc d’essai sur l’hôte Docker : les conteneurs de génération de charge, les quatre conteneurs évalués, le réseau Docker commun et la couche d’observabilité. Le fichier source PlantUML versionné, qui constitue la représentation complète destinée au rendu final, est disponible dans [`docs/figures/architecture.puml`](figures/architecture.puml).
 
 ```mermaid
 flowchart LR
@@ -175,7 +175,7 @@ flowchart LR
 	M --> F[Grafana]
 ```
 
-**Figure 1 —** Architecture du banc d’essai et flux d’observabilité. Les quatre services évalués sont isolés dans des conteneurs soumis à la même limite CPU; k6 mesure le comportement applicatif et Prometheus/Grafana relient ces mesures aux ressources consommées.
+**Figure 1 —** Vue simplifiée du diagramme de déploiement du banc d’essai. Les quatre services évalués sont déployés comme des conteneurs distincts dans le réseau Docker `mgl870-benchmark`, chacun soumis à la même limite CPU; les conteneurs k6 génèrent la charge et la chaîne Prometheus/cAdvisor/Grafana collecte et visualise les mesures.
 
 ### 6.4. Contexte d’interprétation
 
