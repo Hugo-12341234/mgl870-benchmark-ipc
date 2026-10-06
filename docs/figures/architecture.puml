@@ -1,0 +1,48 @@
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #34495E
+skinparam ComponentBorderColor #34495E
+skinparam ComponentBackgroundColor #F7F9FB
+skinparam PackageBorderColor #7F8C8D
+skinparam PackageBackgroundColor #FFFFFF
+
+actor "Générateur de charge\nk6" as k6
+
+package "Environnement Docker" {
+  package "Services évalués\n0,25 vCPU chacun" {
+    component "REST\nHTTP/1.1 + JSON" as rest
+    component "GraphQL\nHTTP/1.1 + JSON" as graphql
+    component "JSON-RPC\nHTTP/1.1 + JSON" as jsonrpc
+    component "gRPC\nHTTP/2 + Protobuf" as grpc
+  }
+
+  component "Prometheus" as prometheus
+  component "cAdvisor /\ndocker-metrics" as metrics
+  component "Grafana" as grafana
+}
+
+k6 --> rest : POST /api/ticks\nPOST /api/ticks/batch
+k6 --> graphql : POST /graphql
+k6 --> jsonrpc : POST /jsonrpc
+k6 --> grpc : IngestTick\nIngestTickBatch
+
+metrics ..> rest : CPU / mémoire
+metrics ..> graphql : CPU / mémoire
+metrics ..> jsonrpc : CPU / mémoire
+metrics ..> grpc : CPU / mémoire
+metrics --> prometheus : métriques
+k6 --> prometheus : latence / débit / erreurs
+prometheus --> grafana : requêtes PromQL
+
+note right of rest
+Même modèle Tick :
+symbol, price, volume,
+timestamp.
+Réponse de succès après
+désérialisation.
+end note
+
+@enduml
