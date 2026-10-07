@@ -1,0 +1,64 @@
+@startuml "MGL870 - Vue Composants"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam ArrowThickness 2
+skinparam defaultTextAlignment center
+skinparam defaultFontName Arial
+
+title "MGL870 — Diagramme de Composants du Banc d’Essai"
+
+package "Génération de charge" #LightBlue {
+  component "Scénario unitaire\nload_test.js" as Single
+  component "Scénario par lots\nload_test_batch.js" as Batch
+}
+
+package "Serveurs Rust évalués" #LightGreen {
+  component "REST Router\nAxum" as Rest
+  component "GraphQL Schema\nasync-graphql" as Graphql
+  component "JSON-RPC Handler\njsonrpsee + serde_json" as JsonRpc
+  component "gRPC Service\ntonic + prost" as Grpc
+  component "Modèle Tick\nsymbol, price, volume, timestamp" as Tick
+  component "Traitement commun\ndésérialisation + ACK" as Processing
+}
+
+package "Observabilité" #LightYellow {
+  component "Métriques k6\nlatence, débit, erreurs" as K6Metrics
+  component "cAdvisor / docker-metrics\nCPU, mémoire, réseau" as ContainerMetrics
+  component "Prometheus\nstockage et requêtes" as Prometheus
+  component "Grafana\ndashboards" as Grafana
+}
+
+Single --> Rest : Tick
+Single --> Graphql : mutation
+Single --> JsonRpc : méthode
+Single --> Grpc : RPC
+Batch --> Rest : Tick[]
+Batch --> Graphql : mutation batch
+Batch --> JsonRpc : params Tick[]
+Batch --> Grpc : TickList
+
+Rest --> Tick
+Graphql --> Tick
+JsonRpc --> Tick
+Grpc --> Tick
+Rest --> Processing
+Graphql --> Processing
+JsonRpc --> Processing
+Grpc --> Processing
+
+Single --> K6Metrics
+Batch --> K6Metrics
+ContainerMetrics --> Prometheus
+K6Metrics --> Prometheus
+Prometheus --> Grafana
+
+legend right
+Chaque protocole possède un point d’entrée distinct,
+mais le modèle de données et le traitement final sont communs.
+Les implémentations sont déployées dans des conteneurs séparés.
+endlegend
+
+@enduml

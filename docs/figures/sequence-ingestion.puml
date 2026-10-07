@@ -1,0 +1,39 @@
+@startuml "MGL870 - Séquence d’ingestion"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam ArrowThickness 2
+skinparam defaultTextAlignment center
+skinparam defaultFontName Arial
+
+title "MGL870 — Séquence d’une ingestion"
+
+actor "Scénario k6" as K6
+participant "Transport\nHTTP/1.1 ou HTTP/2" as Transport
+participant "Point d’entrée\nREST / GraphQL / JSON-RPC / gRPC" as Endpoint
+participant "Désérialiseur\nJSON ou Protobuf" as Decoder
+participant "Traitement commun" as Processing
+participant "Réponse\nHTTP 200 ou ACK" as Ack
+
+K6 -> Transport : Envoie Tick ou lot de 500 ticks
+Transport -> Endpoint : Requête reçue
+Endpoint -> Decoder : Décode le payload
+Decoder --> Endpoint : Structure Tick / TickList
+Endpoint -> Processing : Transmet la structure
+Processing --> Endpoint : Succès
+Endpoint -> Ack : Construit l’acquittement
+Ack --> K6 : Réponse observée
+
+note over K6, Ack
+Le traitement métier est volontairement absent.
+La mesure couvre principalement le chemin de communication,
+le parsing et la désérialisation sous contrainte CPU.
+end note
+
+alt Protocole textuel
+  Endpoint -> Decoder : Parse JSON et enveloppe
+else gRPC
+  Endpoint -> Decoder : Décode Protobuf
+end
+
+@enduml
