@@ -532,3 +532,136 @@ L’opérabilité et le couplage n’ont pas été mesurés par une étude d’u
 
 Cette limite ne réduit pas leur pertinence; elle définit leur statut épistémique. Les mesures expérimentales répondent à la dimension performance et efficacité matérielle. Les sources techniques, les ADRs et la structure des interfaces soutiennent l’analyse qualitative des coûts. Une étude future pourrait compléter cette analyse par des scénarios de modification, des exercices de diagnostic et une mesure du coût d’exploitation dans plusieurs équipes.
 
+## 12. Menaces à la validité et limites
+
+Une expérimentation de performance ne produit pas une vérité indépendante de son environnement. Elle produit des observations dans un protocole donné, avec une implémentation donnée et une charge de travail donnée. Cette section explicite les menaces qui peuvent limiter la portée des conclusions. La distinction entre validité interne, validité de construit, validité externe et validité des conclusions suit une pratique courante des études expérimentales en génie logiciel [7].
+
+### 12.1. Validité interne
+
+La validité interne concerne la possibilité d’attribuer les différences observées aux facteurs étudiés plutôt qu’à une autre cause.
+
+**Différences d’implémentation.** Les quatre variantes utilisent le même langage, le même modèle de données et un traitement métier minimal, mais elles n’utilisent pas exactement la même bibliothèque ni exactement le même chemin d’exécution. Axum, async-graphql, jsonrpsee et tonic ont chacun leurs propres mécanismes internes. Les résultats portent donc sur la combinaison protocole, bibliothèque et configuration testée, et non sur une implémentation abstraite de chaque standard.
+
+**Contamination entre exécutions.** Les services sont séparés dans des conteneurs, et l’environnement est redémarré entre les runs. Cela réduit la contamination par l’état des processus, mais ne supprime pas les effets de l’hôte, du système de fichiers, du cache, de la température ou des autres processus Windows. Les cinq répétitions permettent d’observer la variabilité résiduelle sans l’éliminer.
+
+**Générateur de charge partagé.** Les quatre scénarios sont exécutés simultanément par k6. Cette décision garantit une pression temporelle comparable, mais elle crée une ressource partagée : CPU, mémoire, connexions et VUs du générateur. Les itérations abandonnées montrent que k6 n’a pas pu lancer toute la charge demandée. Elles doivent donc être rapportées comme une limite de capacité du dispositif et non attribuées automatiquement à un serveur particulier.
+
+**Ordre et concurrence des scénarios.** Les protocoles sont sollicités dans une même exécution, mais les variations de planification peuvent ne pas être parfaitement identiques entre les séries temporelles. Une étude complémentaire pourrait exécuter chaque protocole séparément avec exactement le même profil, au prix d’une comparabilité temporelle moins directe. La présente étude limite ce risque par cinq répétitions et par l’utilisation d’une configuration identique.
+
+**Saturation réseau ou CPU.** La limite de `0,25` vCPU vise à faire apparaître la contrainte de calcul, mais l’environnement Windows/WSL2/Hyper-V peut aussi introduire un plafond réseau. Les métriques CPU et les captures Grafana montrent que les conteneurs atteignent leur limite, ce qui soutient l’interprétation computationnelle; elles ne prouvent toutefois pas que le réseau n’a jamais contribué à la latence.
+
+### 12.2. Validité de construit
+
+La validité de construit concerne la correspondance entre les concepts étudiés et les mesures utilisées.
+
+**Performance.** La latence, le débit et le taux d’erreur sont des indicateurs pertinents pour l’ingestion à haute fréquence. Le p50 décrit le comportement central, tandis que le p95 et le p99 rendent visibles les files d’attente et les dégradations de la queue. Le débit de ticks est plus pertinent que le seul débit de requêtes pour le scénario batch, car chaque requête contient 500 objets.
+
+**Efficacité matérielle.** L’utilisation CPU des conteneurs est un indicateur de pression sur les ressources, mais elle ne constitue pas un profil détaillé du coût de parsing, de sérialisation ou de transport. Le benchmark montre une différence de travail utile sous une même limite CPU; il ne mesure pas directement le nombre de cycles, les allocations, les instructions exécutées ou le temps exact de chaque étape.
+
+**Opérabilité.** L’opérabilité est analysée à partir des propriétés documentées des interfaces et de leur outillage. Elle n’est pas mesurée par des temps de diagnostic, des enquêtes auprès d’équipes ou des données d’incidents. Les affirmations de la section 11 doivent donc rester qualitatives.
+
+**Couplage et modifiabilité.** Le fichier `.proto`, le schéma GraphQL, les méthodes JSON-RPC et les conventions REST matérialisent différents types de contrat. Toutefois, le benchmark ne mesure ni le nombre de changements requis pour faire évoluer ces contrats ni le délai de coordination entre équipes. La comparaison décrit un risque architectural plausible, pas un coût organisationnel universel.
+
+**Métriques par protocole.** Les fichiers JSON exportés par k6 agrègent certaines métriques personnalisées sur les quatre tags `protocol`. Les classements par protocole reposent donc sur les séries Grafana et leurs captures, dont les valeurs sont lues à l’échelle des graphiques. Cette limite interdit de présenter ces lectures comme des mesures numériques aussi précises que les valeurs agrégées du JSON.
+
+### 12.3. Validité externe
+
+La validité externe concerne la transférabilité des résultats à d’autres environnements.
+
+**Taille et forme du payload.** L’étude utilise un tick minimal composé de quatre champs et un lot de 500 copies de ce tick. Les résultats peuvent changer avec des chaînes plus longues, des structures imbriquées, des champs optionnels, des données moins répétitives ou des lots de taille intermédiaire. Le seuil observé est donc encadré entre 1 et 500 ticks, et non généralisé à toutes les charges.
+
+**Environnement logiciel.** Les serveurs sont écrits en Rust et exécutés avec les bibliothèques présentes dans ce dépôt. Un autre langage, une autre version de bibliothèque, TLS, un proxy, un service mesh ou une topologie multi-hôtes pourraient modifier le classement.
+
+**Environnement matériel.** La contrainte de `0,25` vCPU est utile pour rendre visibles les différences, mais elle ne représente pas toutes les configurations de production. Avec davantage de CPU, le point de saturation pourrait disparaître ou être déplacé; avec un réseau distant, le coût du transport pourrait devenir dominant.
+
+**Nature de l’application.** Le serveur ne contient ni base de données, ni logique métier, ni validation financière, ni persistance. Les conclusions portent sur la frontière de communication et la désérialisation dans un micro-service minimal. Elles ne prédisent pas directement la performance d’un système financier complet.
+
+**Profil de communication.** Les tests évaluent des appels synchrones d’ingestion. Ils ne couvrent pas le streaming bidirectionnel, les longues connexions, les retries, le contrôle de flux, les erreurs partielles, la sécurité ou la résilience. Une décision pour un système réel doit donc reproduire les scénarios opérationnels pertinents.
+
+### 12.4. Validité des conclusions
+
+Les cinq répétitions par scénario renforcent la crédibilité de la tendance, mais elles ne constituent pas une preuve de significativité statistique générale. Le rapport ne calcule pas d’intervalle de confiance par protocole et ne réalise pas de test statistique entre distributions. Les termes « nettement », « domine » ou « meilleure » doivent donc être compris dans le domaine expérimental défini par les captures et les scénarios, et non comme des affirmations universelles.
+
+La métrique agrégée contient aussi des itérations abandonnées. Une itération abandonnée signifie que k6 n’a pas démarré le travail prévu; elle ne représente pas nécessairement une réponse reçue en erreur. Les conclusions de performance privilégient donc les requêtes effectivement observées, les checks applicatifs et les séries temporelles, tout en rapportant la pression exercée sur l’injecteur.
+
+Enfin, les captures Grafana sont représentatives, mais elles ne remplacent pas les données sources. Leur fonction est de montrer le comportement temporel et la saturation; les JSON servent à vérifier les compteurs et la stabilité inter-runs. Cette complémentarité doit être conservée dans la version finale du rapport.
+
+### 12.5. Limites de mesure et de reproductibilité
+
+La reproductibilité logicielle est bien soutenue par le dépôt : code, Docker Compose, scripts k6, contrat Protocol Buffers, dashboards, JSON et captures sont conservés. La reproductibilité exacte des temps de réponse reste toutefois conditionnée par l’hôte, la version de Docker, la virtualisation et les conditions de charge. Une personne extérieure peut reproduire le protocole et comparer les tendances, mais elle ne doit pas s’attendre à retrouver chaque valeur au milliseconde près.
+
+Les timestamps des captures, la configuration de l’hôte et les versions exactes des images Docker devraient être archivés avec la remise finale si ces informations sont disponibles. Cette documentation réduirait encore l’ambiguïté sur les conditions d’exécution.
+
+### 12.6. Effet des limites sur la conclusion
+
+Ces menaces ne rendent pas l’étude invalide; elles définissent ce qu’elle permet raisonnablement de conclure. Les preuves soutiennent une inversion de classement entre un message unitaire et un lot de 500 ticks sous contrainte CPU, répétée cinq fois pour chaque scénario. Elles ne soutiennent pas un seuil universel, une supériorité absolue de gRPC ou une mesure quantitative du coût organisationnel.
+
+La conclusion est donc proportionnée aux preuves : les résultats justifient une décision conditionnelle dans un contexte d’ingestion interne similaire, mais une équipe devrait reproduire l’expérience avec ses payloads, ses bibliothèques, son réseau et ses exigences d’exploitation avant de généraliser le choix.
+
+## 13. Implications pour les architectes logiciels
+
+### 13.1. Leçon principale
+
+La principale implication est qu’un protocole de communication doit être choisi en fonction d’un scénario de charge et d’un ensemble d’attributs de qualité, pas en fonction d’un classement technologique général. Dans ce projet, la même architecture obtient deux réponses différentes selon que la requête contient un tick ou 500 ticks. La taille du payload et la contrainte CPU sont donc des variables de décision architecturale, et non de simples détails de benchmark.
+
+La recommandation transférable est la suivante : **mesurer le protocole dans la forme de charge réellement critique, puis comparer le gain de performance au coût d’opérabilité, de couplage et d’évolution du contrat.** Cette règle est cohérente avec l’idée qu’une décision d’architecture doit être justifiée par les qualités prioritaires du système et par des scénarios mesurables [8].
+
+### 13.2. Quand privilégier REST
+
+REST est une décision raisonnable lorsque les payloads sont petits, que les clients sont variés, que l’interopérabilité compte et que les outils HTTP génériques ont une forte valeur opérationnelle. Les résultats unitaires renforcent cette option dans le contexte étudié : REST obtient le meilleur débit de requêtes et la meilleure latence de queue observée.
+
+REST ne doit toutefois pas être choisi uniquement parce qu’il est familier. Pour un volume élevé, le parsing JSON et la taille des messages peuvent devenir un coût mesurable. L’architecte devrait alors vérifier le débit de ticks, la consommation CPU et les p99 dans une charge représentative plutôt que d’extrapoler à partir du scénario unitaire.
+
+### 13.3. Quand considérer JSON-RPC
+
+JSON-RPC est pertinent lorsque le domaine est naturellement exprimé par des appels de procédure et que la lisibilité du JSON reste importante. Il peut constituer un compromis lorsque l’équipe veut un nom de méthode et une enveloppe de paramètres explicites sans adopter immédiatement un contrat binaire.
+
+Les résultats batch montrent cependant que le maintien d’une représentation textuelle conserve un coût sous forte contrainte CPU. JSON-RPC devrait donc être retenu pour sa clarté d’interface ou son interopérabilité, et non comme une optimisation de débit par rapport à une représentation binaire.
+
+### 13.4. Quand considérer GraphQL
+
+GraphQL est adapté lorsque la flexibilité de requêtage est une exigence réelle : plusieurs consommateurs ont des besoins de données différents, la réduction des échanges est importante et l’équipe peut gouverner un schéma partagé. Cette valeur fonctionnelle n’est pas exercée par une mutation d’ingestion fixe comme celle du benchmark.
+
+L’implication n’est pas d’exclure GraphQL des systèmes à forte charge. Elle est de vérifier que la flexibilité justifie le coût du parsing, de l’exécution des résolveurs, de la gouvernance du schéma et de l’observabilité. Pour un chemin d’ingestion répétitif dont le contrat est stable, l’étude fournit un signal défavorable à l’adoption de GraphQL sous contrainte CPU.
+
+### 13.5. Quand considérer gRPC
+
+gRPC devient une option forte lorsque la communication est interne, que les consommateurs sont identifiés, que les contrats sont suffisamment stables et que la performance de lots ou de flux volumineux est critique. Les cinq runs batch montrent que son avantage est particulièrement visible lorsque 500 ticks sont regroupés et que chaque serveur est limité à `0,25` vCPU.
+
+Avant d’adopter gRPC, l’architecte devrait néanmoins prévoir :
+
+- une gouvernance du fichier `.proto` et des règles de compatibilité;
+- la génération et la publication des artefacts clients;
+- des outils de diagnostic capables de décoder les messages;
+- des métriques et traces adaptées aux appels RPC;
+- une stratégie de versionnement, de dépréciation et de migration;
+- une documentation destinée aux équipes qui ne manipulent pas quotidiennement HTTP/2 et Protocol Buffers.
+
+Le gain de performance ne justifie gRPC que si ces coûts sont acceptables dans l’organisation cible. La documentation officielle de gRPC et de Protocol Buffers décrit les mécanismes techniques [4][5], mais elle ne peut pas déterminer à la place d’une équipe si son coût opérationnel est acceptable.
+
+### 13.6. Procédure de décision recommandée
+
+Une décision réutilisable peut suivre les étapes suivantes :
+
+1. définir le scénario critique : taille du payload, fréquence, débit de données et p99 attendu;
+2. identifier les clients, le nombre d’équipes et la fréquence probable des changements de contrat;
+3. choisir une baseline lisible, généralement REST ou JSON-RPC, puis mesurer les alternatives;
+4. limiter les ressources selon la contrainte réelle du système et surveiller le serveur ainsi que l’injecteur;
+5. répéter les mesures et conserver les données brutes;
+6. comparer le gain de performance avec les coûts d’outillage, de diagnostic, de versionnement et de migration;
+7. consigner la décision et ses conditions de réévaluation dans un ADR.
+
+Cette procédure reprend l’esprit des ADRs du projet : une technologie n’est pas choisie isolément, mais dans un contexte, avec des options, des conséquences et des preuves disponibles.
+
+### 13.7. Implications pour l’observabilité et les SLO
+
+Le choix du protocole doit être lié aux objectifs de service. Un SLO de latence p99 très strict pour un flux volumineux peut justifier un protocole plus spécialisé, tandis qu’un objectif plus modeste peut rendre préférable une interface plus facile à diagnostiquer. Les métriques doivent être étiquetées par protocole, taille de payload et scénario; sinon, une moyenne agrégée peut masquer une dégradation d’une variante particulière.
+
+L’expérience montre aussi qu’il faut surveiller l’injecteur. Un taux d’erreur nul ne signifie pas que toute la charge demandée a été exécutée : les itérations abandonnées peuvent révéler que k6 ou les VUs disponibles ont atteint une limite. Dans une évaluation réelle, l’architecte devrait donc instrumenter à la fois le client de charge, le serveur, le réseau et les ressources de l’hôte.
+
+### 13.8. Portée de la transférabilité
+
+Les leçons sont transférables à des communications internes où les messages et les ressources ressemblent aux scénarios étudiés. Elles sont moins directement transférables à des APIs publiques, à des systèmes multi-régions, à des communications sécurisées par TLS, à des flux asynchrones ou à des applications dominées par la base de données.
+
+La bonne pratique consiste à transférer la méthode de raisonnement plutôt que le classement brut : identifier les attributs prioritaires, établir une baseline, mesurer la charge critique, documenter les compromis et vérifier les hypothèses dans le contexte cible. C’est cette méthode, plus que la préférence pour REST ou gRPC, qui constitue la contribution architecturale principale du projet.
+
