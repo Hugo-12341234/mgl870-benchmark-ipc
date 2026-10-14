@@ -665,3 +665,60 @@ Les leçons sont transférables à des communications internes où les messages 
 
 La bonne pratique consiste à transférer la méthode de raisonnement plutôt que le classement brut : identifier les attributs prioritaires, établir une baseline, mesurer la charge critique, documenter les compromis et vérifier les hypothèses dans le contexte cible. C’est cette méthode, plus que la préférence pour REST ou gRPC, qui constitue la contribution architecturale principale du projet.
 
+## 14. Conclusion
+
+### 14.1. Ce que cette étude a appris
+
+Cette étude montre que le choix d’un protocole de communication est une décision conditionnelle à la charge de travail. Il n’existe pas, dans le contexte étudié, de protocole dominant simultanément pour les micro-messages et pour les lots volumineux.
+
+Pour l’ingestion d’un tick par requête, REST obtient le meilleur comportement observé en matière de débit de requêtes et de latence de queue. Sa simplicité de transport et son opérabilité plus immédiate sont cohérentes avec un scénario où le contenu du message est faible et où le coût fixe de la pile de communication représente une part importante du travail total.
+
+Pour l’ingestion de lots de 500 ticks, gRPC obtient le meilleur débit de ticks et la meilleure latence p99 observée. Sous la limite commune de `0,25` vCPU, son efficacité devient suffisamment importante pour dépasser les alternatives textuelles. GraphQL présente le coût le plus élevé dans ce scénario, tandis que JSON-RPC conserve une position intermédiaire.
+
+La conclusion ne doit toutefois pas être formulée comme « gRPC est meilleur que REST ». La conclusion défendable est plutôt : **REST est préférable dans le scénario de micro-messages observé, tandis que gRPC est préférable pour les lots volumineux et répétitifs lorsque la performance CPU est prioritaire et que l’organisation peut absorber son coût opérationnel.**
+
+### 14.2. Preuves soutenant la conclusion
+
+La conclusion repose sur plusieurs éléments convergents :
+
+- cinq répétitions du scénario unitaire et cinq répétitions du scénario batch;
+- zéro échec dans les checks REST, GraphQL, JSON-RPC et gRPC;
+- un taux d’erreur applicatif nul dans les runs conservés;
+- une saturation répétée des conteneurs autour de la limite de `0,25` vCPU;
+- une inversion du classement entre le scénario d’un tick et celui de 500 ticks;
+- des captures Grafana montrant la stabilité temporelle des tendances;
+- des fichiers JSON conservant les compteurs, les durées agrégées et les itérations abandonnées;
+- une implémentation, une configuration Docker et un protocole d’expérience versionnés dans le dépôt.
+
+Les données encadrent le point de bascule entre 1 et 500 ticks par requête. Elles ne localisent pas le seuil exact à l’intérieur de cet intervalle et ne mesurent pas directement le coût d’opérabilité, de diagnostic ou de gouvernance des contrats. Ces limites font partie de la conclusion plutôt que de l’annuler.
+
+### 14.3. Importance pour l’architecte logiciel
+
+L’importance architecturale de ce résultat est de remplacer une préférence technologique par une règle de décision fondée sur les attributs de qualité. Une équipe qui choisit gRPC uniquement parce qu’il est réputé rapide risque d’ajouter du couplage et de l’outillage sans bénéfice pour ses petits messages. Une équipe qui conserve REST uniquement parce qu’il est simple risque, à l’inverse, de subir un coût CPU important lorsque le volume par requête augmente.
+
+La démarche recommandée est donc de caractériser la charge critique, d’établir une baseline, de mesurer les alternatives dans un environnement représentatif et de documenter les conséquences non fonctionnelles du choix. Le résultat transférable n’est pas un classement universel des protocoles, mais une méthode pour défendre une décision architecturale par des preuves et des hypothèses explicites.
+
+### 14.4. Réponse finale et perspectives
+
+La réponse finale à la question de recherche est la suivante : dans l’environnement et les scénarios étudiés, le gain mécanique de gRPC ne justifie pas son coût supplémentaire pour le micro-message unitaire; il devient défendable pour un lot de 500 ticks sous contrainte CPU, car le gain de débit et de latence est alors nettement visible. Le seuil précis reste à mesurer avec des tailles intermédiaires, par exemple 10, 50, 100 et 250 ticks, si une localisation plus fine est nécessaire.
+
+Une étude future pourrait également extraire directement les séries Prometheus par protocole, mesurer séparément les étapes de parsing et de désérialisation, comparer plusieurs environnements matériels et évaluer l’opérabilité au moyen de scénarios de diagnostic et d’évolution de contrats. Ces extensions renforceraient la portée des résultats, mais elles ne sont pas nécessaires pour soutenir la conclusion conditionnelle du présent rapport.
+
+## 15. Références
+
+[1] Fielding, R. T. (2000). *Architectural Styles and the Design of Network-based Software Architectures*. Doctoral dissertation, University of California, Irvine. https://ics.uci.edu/~fielding/pubs/dissertation/top.htm
+
+[2] JSON-RPC Working Group. (2010). *JSON-RPC 2.0 Specification*. https://www.jsonrpc.org/specification
+
+[3] GraphQL Foundation. (2021). *GraphQL Specification, October 2021 edition*. https://spec.graphql.org/October2021/
+
+[4] gRPC Authors. (s. d.). *Core concepts, architecture and lifecycle*. Documentation officielle de gRPC. Consulté le 14 octobre 2026. https://grpc.io/docs/what-is-grpc/core-concepts/
+
+[5] Protocol Buffers Authors. (s. d.). *Language Guide (proto3)*. Documentation officielle de Protocol Buffers. Consulté le 14 octobre 2026. https://protobuf.dev/programming-guides/proto3/
+
+[6] Kleppmann, M. (2017). *Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems*. O’Reilly Media. https://dataintensive.net/
+
+[7] Wohlin, C., Runeson, P., Höst, M., Ohlsson, M. C., Regnell, B., & Wesslén, A. (2012). *Experimentation in Software Engineering*. Springer. https://doi.org/10.1007/978-3-642-29044-2
+
+[8] Bass, L., Clements, P., & Kazman, R. (2021). *Software Architecture in Practice* (4th ed.). Addison-Wesley Professional. https://www.informit.com/store/software-architecture-in-practice-9780136886099
+
