@@ -1,0 +1,51 @@
+@startuml "MGL870 - Décision de protocole"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam ArrowThickness 2
+skinparam defaultTextAlignment center
+skinparam defaultFontName Arial
+skinparam activity {
+  BackgroundColor #F7F9FB
+  BorderColor #34495E
+}
+
+title "MGL870 — Arbre de décision architectural"
+
+start
+:Identifier le volume de charge
+par requête;
+
+if (Payload volumineux
+ou débit de ticks critique ?) then (Oui)
+  if (Performance CPU prioritaire
+et communication interne ?) then (Oui)
+    :Évaluer gRPC;
+    :Vérifier le coût du contrat .proto,
+de l'outillage et de l'observabilité;
+    if (Gain mesuré justifie
+le coût opérationnel ?) then (Oui)
+      :Choisir gRPC;
+    else (Non)
+      :Conserver REST ou JSON-RPC
+selon le style d'interface;
+    endif
+  else (Non)
+    :Privilégier la lisibilité
+et l'interopérabilité;
+    :Évaluer REST ou JSON-RPC;
+  endif
+else (Non)
+  if (Requêtes dynamiques
+nécessaires ?) then (Oui)
+    :Évaluer GraphQL;
+    :Vérifier que le coût du parsing
+est acceptable sous charge;
+  else (Non)
+    :Privilégier REST comme baseline
+simple et observable;
+  endif
+endif
+
+stop
+@enduml

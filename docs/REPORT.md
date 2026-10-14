@@ -441,3 +441,94 @@ Les données ne permettent pas d’affirmer que gRPC est toujours plus efficace,
 
 Elles permettent néanmoins d’affirmer trois résultats importants : le traitement applicatif de succès est resté fiable pour les quatre protocoles; le comportement change nettement lorsque le payload passe d’un tick à 500 ticks; et ce changement est répété dans cinq runs unitaires et cinq runs batch. C’est cette combinaison de résultats, de répétitions et de limites explicites qui rend la conclusion architecturale défendable.
 
+## 11. Compromis architecturaux
+
+### 11.1. Nature du compromis
+
+Les résultats montrent qu’une décision de protocole ne peut pas être réduite à un classement de latence. REST domine le scénario unitaire observé, tandis que gRPC domine le scénario par lots. Cette inversion indique que la performance dépend de la charge de travail, mais elle ne suffit pas à décider seule de l’architecture. Un protocole est aussi une interface de développement, un contrat entre équipes et un composant d’exploitation.
+
+Dans cette section, les performances sont donc considérées comme des preuves expérimentales, tandis que l’opérabilité, la flexibilité et le couplage sont analysés qualitativement à partir des propriétés des technologies, de la documentation de référence et des décisions ADR. Le benchmark ne mesure pas directement le temps nécessaire pour diagnostiquer un incident ou modifier un contrat. Il serait donc incorrect de présenter les coûts opérationnels comme des valeurs quantitatives équivalentes aux p95 mesurés.
+
+### 11.2. Performance contre opérabilité
+
+L’opérabilité désigne ici la facilité avec laquelle une équipe peut déployer, observer, diagnostiquer, tester et maintenir la communication en production. Elle comprend notamment la visibilité du trafic, la disponibilité des outils, la simplicité de reproduction d’un appel et la capacité à comprendre une erreur sans connaître toute la pile technique.
+
+REST bénéficie d’une opérabilité élevée dans le contexte général de l’étude. Les requêtes HTTP et les payloads JSON peuvent être inspectés avec des outils génériques, enregistrés dans des journaux lisibles et rejoués avec des clients largement disponibles. Cette propriété ne garantit pas une meilleure performance, mais elle réduit le coût de diagnostic pour les micro-messages, domaine où REST obtient déjà le meilleur résultat observé.
+
+JSON-RPC conserve une grande partie de cette lisibilité tout en exprimant explicitement une opération et ses paramètres. Son enveloppe ajoute de la structure et un contrat de méthode, mais les messages restent inspectables comme JSON. Il constitue ainsi un compromis entre le modèle orienté ressource de REST et un appel de procédure plus explicite.
+
+GraphQL dispose d’un écosystème d’outils riche, mais l’observation d’une requête demande de comprendre le schéma, la mutation, les variables et le chemin d’exécution du résolveur. Cette complexité peut être justifiée lorsqu’elle permet aux clients de contrôler précisément les données demandées. Dans le scénario d’ingestion fixe étudié ici, cette flexibilité apporte peu de valeur et son coût d’exécution devient visible dans les résultats batch.
+
+gRPC apporte des outils spécialisés, la génération de code et un contrat de service explicite, mais le trafic binaire n’est pas immédiatement lisible dans un proxy ou un journal HTTP ordinaire. L’équipe doit disposer d’outils capables de charger le contrat `.proto`, d’interpréter les messages et de comprendre HTTP/2. La documentation officielle de gRPC décrit ces mécanismes et leurs outils [4]; elle soutient l’analyse de cette dépendance à une chaîne d’outillage spécialisée, sans fournir une mesure du coût opérationnel dans l’organisation étudiée.
+
+### 11.3. Flexibilité contre coût de traitement
+
+GraphQL maximise la flexibilité de la forme de la requête. Cette flexibilité est pertinente lorsqu’un même service doit répondre à des besoins de lecture variables ou éviter une multiplication d’endpoints spécialisés. Elle est moins pertinente pour une opération d’ingestion répétitive dont le schéma est connu à l’avance. Dans le benchmark, les quatre scénarios utilisent des opérations fixes; GraphQL conserve donc le coût de son analyse dynamique sans que son principal bénéfice fonctionnel soit sollicité.
+
+REST offre une interface plus explicite et moins dynamique pour le scénario retenu. JSON-RPC formalise l’action sans introduire un langage de requête. gRPC formalise également l’action, mais à travers un contrat fortement typé et des artefacts générés. Le choix entre ces alternatives doit donc tenir compte de la variabilité des consommateurs : plus les besoins de requête sont dynamiques, plus GraphQL peut justifier sa complexité; plus le schéma est stable et le volume élevé, plus un contrat RPC efficace peut être avantageux.
+
+### 11.4. Couplage contractuel et modifiabilité
+
+Le couplage contractuel décrit ici la dépendance entre le client et le serveur pour comprendre, générer et faire évoluer l’interface. Il ne faut pas confondre couplage fort avec mauvaise architecture : un contrat explicite peut réduire les ambiguïtés et détecter des incompatibilités avant l’exécution. En contrepartie, il exige une gouvernance de versionnement et une coordination plus rigoureuse.
+
+Avec gRPC, le fichier `.proto` constitue une source contractuelle partagée. La génération de code améliore la cohérence des types et rend les opérations disponibles plus explicites, mais une évolution du contrat doit respecter les règles de compatibilité de Protocol Buffers et être propagée aux consommateurs concernés [5]. Le couplage est donc visible et outillé, mais il devient une responsabilité architecturale à gérer.
+
+REST peut aussi être couplé à un schéma ou à des conventions, mais son format JSON et ses outils génériques permettent souvent une évolution plus tolérante au niveau de la représentation. Cette souplesse peut réduire la coordination initiale, mais elle peut aussi déplacer les erreurs vers l’exécution lorsque le contrat est implicite ou insuffisamment documenté. JSON-RPC se trouve entre les deux : les noms de méthodes et les paramètres forment un contrat, mais la représentation demeure dynamique et textuelle.
+
+GraphQL centralise une partie du contrat dans le schéma. Le schéma explicite les opérations et les types, tout en permettant des requêtes variables à l’intérieur de cet espace. Il réduit certains problèmes de sur- ou sous-récupération, mais introduit une gouvernance du schéma et des enjeux de compatibilité liés à l’évolution des champs et des résolveurs.
+
+### 11.5. Matrice qualitative des compromis
+
+Les évaluations suivantes sont qualitatives et servent à rendre les décisions explicites; elles ne constituent pas des mesures expérimentales. Elles synthétisent les propriétés documentées et les conséquences observées dans le banc d’essai.
+
+| Protocole | Performance unitaire observée | Performance batch observée | Opérabilité | Couplage contractuel | Flexibilité | Coût architectural dominant |
+| --- | --- | --- | --- | --- | --- | --- |
+| REST | Meilleure dans le scénario étudié | Compétitive, derrière gRPC | Élevée | Faible à modéré | Modérée | Parsing JSON et conventions à gouverner |
+| JSON-RPC | Intermédiaire | Inférieure à REST et gRPC | Élevée à modérée | Modéré | Modérée | Enveloppe RPC et parsing textuel |
+| GraphQL | Inférieure dans le scénario étudié | La moins favorable | Modérée | Modéré à élevé via le schéma | Élevée | Parsing et exécution dynamique |
+| gRPC | Inférieure à REST dans le scénario étudié | Meilleure dans le scénario étudié | Modérée à faible sans outillage spécialisé | Élevé et explicite | Faible à modérée | Contrats `.proto`, génération et diagnostic binaire |
+
+La matrice doit être lue conjointement avec les résultats. « Élevée » en opérabilité ne signifie pas « meilleure dans tous les systèmes », et « élevé » en couplage ne signifie pas « mauvais ». Il s’agit de coûts et de bénéfices qui prennent une valeur différente selon les contraintes du système.
+
+### 11.6. Quand le gain de gRPC justifie-t-il sa complexité?
+
+Les cinq runs batch fournissent le cas le plus favorable à gRPC : le débit de ticks est nettement supérieur et la latence p99 est beaucoup plus faible que pour les protocoles textuels sous la même contrainte CPU. Dans un service interne où le volume est élevé, où les consommateurs sont connus et où la performance est un attribut critique, ce gain peut justifier la gestion des contrats `.proto`, la génération de code et l’outillage d’observation.
+
+Le choix est moins évident pour les micro-messages. Les cinq runs unitaires montrent que REST domine la performance dans la configuration étudiée, tout en offrant une inspection plus simple. Adopter gRPC dans ce cas imposerait le coût de son contrat et de sa chaîne d’exploitation sans bénéfice mesuré dans ce benchmark. La décision gRPC ne devient raisonnable que si d’autres exigences non évaluées, par exemple la compatibilité avec un écosystème gRPC existant ou des besoins de streaming, compensent ce résultat.
+
+Le point de bascule doit donc être défini comme une décision économique et opérationnelle, pas uniquement comme une taille de payload. La taille est le facteur manipulé dans l’expérience; la justification finale dépend aussi de la criticité du débit, du nombre d’équipes, de la stabilité du contrat, de la maturité des outils et du coût acceptable d’un diagnostic.
+
+### 11.7. Règle de décision proposée
+
+Une équipe devrait commencer par caractériser le scénario réel : taille et fréquence des messages, criticité de la latence, nombre de consommateurs, fréquence des changements de contrat et capacité des équipes à exploiter des outils spécialisés. Elle devrait ensuite reproduire une mesure représentative, car les résultats de ce projet ne remplacent pas une mesure dans le contexte cible.
+
+L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml). Il formalise les règles suivantes :
+
+1. pour un payload petit et une forte priorité donnée à la lisibilité, commencer par REST;
+2. pour un appel de procédure textuel et inspectable, considérer JSON-RPC;
+3. pour des besoins de requêtage réellement dynamiques, considérer GraphQL après mesure du coût d’exécution;
+4. pour un volume élevé, un contrat stable et une contrainte CPU forte, évaluer gRPC;
+5. adopter gRPC seulement si le gain mesuré compense le coût d’opérabilité et de couplage dans l’organisation cible.
+
+```mermaid
+flowchart TD
+	A[Caractériser la charge réelle] --> B{Payload volumineux ou débit critique ?}
+	B -- Non --> C{Requêtes dynamiques nécessaires ?}
+	C -- Non --> D[REST : simplicité et observabilité]
+	C -- Oui --> E[GraphQL : mesurer le coût du parsing]
+	B -- Oui --> F{CPU critique et communication interne ?}
+	F -- Non --> G[REST ou JSON-RPC selon le style d'interface]
+	F -- Oui --> H[Évaluer gRPC]
+	H --> I{Gain mesuré > coût opérationnel ?}
+	I -- Oui --> J[Adopter gRPC dans ce périmètre]
+	I -- Non --> G
+```
+
+**Figure 10 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
+
+### 11.8. Limite de cette analyse
+
+L’opérabilité et le couplage n’ont pas été mesurés par une étude d’utilisateurs, une analyse de tickets d’incident, un suivi du temps de maintenance ou une comparaison du nombre de changements de contrat. Les conclusions de cette section sont donc des implications architecturales argumentées, non des résultats quantitatifs supplémentaires.
+
+Cette limite ne réduit pas leur pertinence; elle définit leur statut épistémique. Les mesures expérimentales répondent à la dimension performance et efficacité matérielle. Les sources techniques, les ADRs et la structure des interfaces soutiennent l’analyse qualitative des coûts. Une étude future pourrait compléter cette analyse par des scénarios de modification, des exercices de diagnostic et une mesure du coût d’exploitation dans plusieurs équipes.
+
