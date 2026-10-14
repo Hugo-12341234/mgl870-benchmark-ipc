@@ -303,7 +303,9 @@ Les cinq runs individuels ont duré entre 600,97 et 601,76 secondes. Les cinq ru
 
 Les JSON exportent principalement des métriques agrégées sur les quatre scénarios. Ils ne permettent pas de calculer directement, pour chaque protocole, les p50/p95/p99 de la métrique personnalisée. Les comparaisons individuelles entre protocoles sont donc fondées sur les séries Grafana et leurs captures; les tableaux ci-dessous décrivent explicitement les agrégats JSON et ne les présentent pas comme des mesures par protocole.
 
-### 9.2. Résultats consolidés du scénario unitaire
+### 9.2. Stabilité agrégée des répétitions unitaires
+
+Le tableau suivant ne compare pas REST, GraphQL, JSON-RPC et gRPC entre eux. Il résume les métriques agrégées par k6 sur les quatre protocoles afin de vérifier la répétabilité et le niveau de saturation des cinq répétitions. Il répond à la question méthodologique : **les runs unitaires ont-ils produit des observations suffisamment comparables pour être analysés ensemble?**
 
 | Métrique agrégée k6 | Moyenne des 5 runs | Minimum | Maximum |
 | --- | ---: | ---: | ---: |
@@ -330,7 +332,9 @@ Le run individuel 3 est utilisé comme capture représentative, car sa durée ag
 
 **Figure 5 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
 
-### 9.3. Résultats consolidés du scénario par lots
+### 9.3. Stabilité agrégée des répétitions par lots
+
+Comme le tableau précédent, celui-ci ne constitue pas un classement des protocoles. Il décrit la variabilité globale des cinq runs batch et confirme que la charge demandée a produit une saturation soutenue. La comparaison REST/GraphQL/JSON-RPC/gRPC repose sur les séries Grafana présentées ensuite.
 
 | Métrique agrégée k6 | Moyenne des 5 runs | Minimum | Maximum |
 | --- | ---: | ---: | ---: |
@@ -370,4 +374,70 @@ Le débit de ticks est la mesure la plus pertinente pour les lots. À 500 ticks 
 ### 9.5. Portée des observations
 
 Les résultats établissent une borne expérimentale, et non un seuil continu exact : le classement change entre 1 et 500 ticks par requête. Ils démontrent aussi que les gains de gRPC apparaissent clairement dans le scénario de lots sous contrainte CPU. Ils ne permettent pas de conclure à un seuil universel, ni de séparer parfaitement le coût de chaque couche sans une extraction plus fine des séries Prometheus ou une instrumentation complémentaire.
+
+## 10. Analyse des résultats
+
+### 10.1. Réponse à la question de recherche
+
+La question principale demandait à partir de quel volume de charge utile les gains d’efficacité mécanique de gRPC justifient son coût supplémentaire en opérabilité et en couplage contractuel. Les données ne permettent pas d’identifier un seuil continu exact, puisque seuls deux volumes ont été testés : un tick et un lot de 500 ticks. Elles permettent toutefois d’établir une borne et une inversion de classement clairement répétée.
+
+Pour un tick unitaire, REST constitue la meilleure décision de performance dans l’environnement étudié. Les cinq captures du scénario unitaire montrent que REST conserve le meilleur débit de requêtes et la latence p99 la plus basse dans la phase soutenue. L’avantage attendu de la représentation binaire ne compense donc pas, pour ce micro-message, les coûts fixes associés à la pile gRPC et à son transport. Cette conclusion est locale au scénario : elle ne signifie pas que REST est toujours plus rapide que gRPC.
+
+Pour un lot de 500 ticks, gRPC devient la meilleure décision de performance. Les cinq répétitions montrent un débit d’environ 250 000 ticks/s et une latence p99 proche du bas de l’échelle, alors que les variantes textuelles traitent moins de ticks et présentent une queue de latence plus élevée. Dans ce régime, le volume de données par requête rend l’efficacité de la représentation binaire suffisamment importante pour compenser le coût opérationnel supplémentaire, à condition que la performance et l’efficacité CPU soient prioritaires.
+
+La conclusion défendable est donc conditionnelle : **gRPC est justifiable lorsque la charge utile est suffisamment importante pour rendre le coût de parsing textuel déterminant; pour les micro-messages, REST demeure préférable lorsque la simplicité et l’opérabilité ont une valeur supérieure au gain mécanique potentiel.** Avec les données disponibles, le point de bascule est encadré entre 1 et 500 ticks par requête, mais il n’est pas localisé à l’intérieur de cet intervalle.
+
+### 10.2. Analyse de l’effet de la taille du payload
+
+Le changement de classement entre les deux scénarios est l’observation la plus importante du rapport. Dans le scénario unitaire, le coût fixe de la requête représente une part importante du coût total. La charge utile est trop petite pour que la compacité de Protobuf domine nécessairement l’ensemble du chemin d’exécution. Le transport HTTP/2, la gestion de l’appel RPC et les étapes propres à la pile gRPC peuvent alors peser relativement lourd par rapport au décodage d’un seul tick.
+
+Dans le scénario batch, ces coûts fixes sont amortis sur 500 objets. Le serveur doit analyser et convertir une structure beaucoup plus grande pour les variantes JSON, tandis que gRPC décode un message binaire structuré. Les captures montrent que cette différence devient visible lorsque les conteneurs sont limités à `0,25` vCPU. L’explication par le coût de parsing est cohérente avec l’architecture des implémentations et avec l’amélioration observée de gRPC, mais le benchmark ne mesure pas séparément le temps de parsing, le temps de transport et le temps de traitement. Il faut donc la présenter comme l’interprétation la plus plausible, non comme une décomposition causale directement observée.
+
+### 10.3. Analyse de la contrainte CPU
+
+Les captures CPU montrent que les quatre services atteignent la zone correspondant à leur limite de `0,25` vCPU. Cette saturation est importante pour interpréter les résultats : elle indique que le système n’est pas évalué dans une zone où toutes les variantes disposent de capacité de calcul inutilisée. Les différences de débit utile apparaissent alors malgré une enveloppe CPU identique.
+
+Dans le scénario batch, gRPC traite davantage de ticks avant ou pendant la saturation observée. Cela signifie que son avantage porte surtout sur l’efficacité du travail accompli par unité de ressource, et non sur une consommation CPU absolue plus faible dans toutes les phases. Les quatre conteneurs peuvent atteindre le même plafond tout en produisant des débits différents. L’affirmation défendable est donc : **gRPC offre le meilleur rendement de la capacité CPU dans le scénario de lots étudié**, et non : **gRPC consomme toujours moins de CPU**.
+
+### 10.4. Analyse des protocoles textuels
+
+REST obtient le meilleur résultat parmi les protocoles étudiés pour le scénario unitaire et demeure compétitif dans le scénario batch. Cette performance est cohérente avec son rôle de baseline simple : la requête contient directement la représentation JSON attendue, sans enveloppe RPC complexe ni document de requête dynamique. La simplicité du chemin peut être avantageuse lorsque le payload est petit.
+
+JSON-RPC conserve la lisibilité du JSON, mais ajoute une enveloppe contenant la version, la méthode, les paramètres et l’identifiant. Dans les résultats batch, il se situe entre REST et GraphQL. Cette position est cohérente avec un coût textuel supérieur à la baseline REST, mais inférieur au coût structurel du traitement GraphQL dans le scénario retenu.
+
+GraphQL obtient les résultats les moins favorables dans le scénario batch. La requête contient une mutation, des variables et une structure que le moteur doit analyser avant d’exécuter le résolveur. Le protocole apporte une flexibilité qui n’est pas nécessaire pour cette opération d’ingestion fixe. Le résultat ne condamne pas GraphQL pour les usages où la sélection dynamique des données compense ce coût; il montre plutôt que cette flexibilité est difficile à justifier pour un chemin d’ingestion répétitif et fortement contraint.
+
+### 10.5. Vérification des hypothèses
+
+| Hypothèse | Évaluation | Justification |
+| --- | --- | --- |
+| H1 — coût des micro-messages | Soutenue dans le scénario étudié | REST domine les captures unitaires malgré l’absence de sérialisation binaire |
+| H2 — effet de la taille | Soutenue | Le classement s’inverse pour les lots de 500 ticks et gRPC domine le débit de ticks |
+| H3 — saturation | Soutenue avec réserve | Les conteneurs atteignent la limite CPU et les percentiles élevés se dégradent; la causalité précise n’est pas isolée |
+| H4 — compromis architectural | Soutenue | gRPC gagne en performance batch, mais la décision dépend de la valeur accordée à l’opérabilité et au couplage |
+
+Les hypothèses sont donc confirmées dans les conditions du benchmark, mais aucune ne doit être reformulée comme une loi générale. Les cinq répétitions renforcent la stabilité de la tendance; elles ne suppriment pas les menaces liées à l’environnement, à l’implémentation et aux deux seules tailles de payload.
+
+### 10.6. Signification des itérations abandonnées
+
+Les itérations abandonnées sont élevées dans les deux scénarios, particulièrement lorsque la charge demandée dépasse la capacité combinée du générateur et des services. Elles indiquent que k6 n’a pas pu démarrer toutes les itérations prévues avec les VUs disponibles. Elles ne constituent pas des réponses HTTP ou gRPC en échec : les checks applicatifs restent à zéro échec et les taux d’erreur restent nuls.
+
+Cette distinction est essentielle. Les résultats répondent à une question de capacité sous charge, et la saturation de la charge fait partie du phénomène observé. En revanche, les itérations abandonnées empêchent d’interpréter le débit demandé comme un débit effectivement servi par tous les protocoles. Le rapport doit donc privilégier le débit observé, les séries Grafana et les checks réussis, tout en rapportant les itérations abandonnées comme une limite du dispositif de génération.
+
+### 10.7. Compromis décisionnel résultant des données
+
+Les mesures ne justifient pas une migration générale vers gRPC. Elles soutiennent plutôt une stratégie de décision par scénario :
+
+- choisir REST lorsque les messages sont petits, que l’interopérabilité et le diagnostic rapide dominent, et que le débit unitaire observé est suffisant;
+- considérer JSON-RPC lorsque l’orientation appel de procédure est utile sans accepter un contrat binaire;
+- réserver GraphQL aux situations où sa flexibilité de requêtage apporte une valeur réelle, et non à une ingestion fixe où son coût devient visible;
+- choisir gRPC pour les échanges internes fortement volumineux et répétitifs lorsque le gain de débit et de latence justifie l’outillage spécialisé et la gestion stricte du contrat.
+
+Ces règles ne remplacent pas une mesure dans le contexte cible. Elles constituent des heuristiques transférables dérivées de la comparaison observée, et non des prescriptions indépendantes des charges de travail.
+
+### 10.8. Ce que les données ne permettent pas d’affirmer
+
+Les données ne permettent pas d’affirmer que gRPC est toujours plus efficace, que GraphQL est toujours inadéquat pour l’ingestion, ni que REST est toujours préférable pour les messages courts. Elles ne permettent pas non plus d’identifier la contribution exacte de HTTP/2, de Protocol Buffers, du parsing JSON ou du moteur GraphQL sans instrumentation plus fine.
+
+Elles permettent néanmoins d’affirmer trois résultats importants : le traitement applicatif de succès est resté fiable pour les quatre protocoles; le comportement change nettement lorsque le payload passe d’un tick à 500 ticks; et ce changement est répété dans cinq runs unitaires et cinq runs batch. C’est cette combinaison de résultats, de répétitions et de limites explicites qui rend la conclusion architecturale défendable.
 
