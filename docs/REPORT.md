@@ -232,6 +232,24 @@ Dans les deux scénarios, k6 construit le payload, l’envoie au point d’entr�
 
 Après la désérialisation, aucun calcul métier ni accès externe n’est réalisé. Le serveur retourne immédiatement un succès. Cette séquence est volontairement courte : elle permet d’étudier la frontière de communication, mais elle exclut les coûts qui apparaîtraient dans une application complète. Le diagramme de séquence détaillé est versionné dans [`docs/figures/sequence-ingestion.puml`](figures/sequence-ingestion.puml).
 
+```mermaid
+sequenceDiagram
+	participant K as k6
+	participant T as Transport
+	participant E as Point d’entrée
+	participant D as Désérialiseur
+	participant P as Traitement commun
+	K->>T: Envoie un tick ou un lot de 500 ticks
+	T->>E: Requête reçue
+	E->>D: Décode JSON ou Protobuf
+	D-->>E: Tick ou TickList en mémoire
+	E->>P: Transmet la structure
+	P-->>E: Succès
+	E-->>K: HTTP 200 ou ACK
+```
+
+**Figure 3 —** Séquence commune d’une ingestion. Les variantes diffèrent principalement par le transport et le désérialiseur; le traitement applicatif après décodage est volontairement identique et minimal.
+
 ### 7.4. Décisions architecturales documentées par ADR
 
 Les décisions importantes sont conservées comme des ADRs dans `docs/adr/`. Elles rendent explicites le contexte, les alternatives et les conséquences plutôt que de présenter l’architecture comme un assemblage de choix techniques implicites.
@@ -316,21 +334,21 @@ Le tableau suivant ne compare pas REST, GraphQL, JSON-RPC et gRPC entre eux. Il 
 | Itérations exécutées | 6 410 896 | 6 354 906 | 6 483 177 |
 | Itérations abandonnées | 1 264 481 | 1 195 812 | 1 323 266 |
 
-Les cinq runs sont donc relativement cohérents sur la durée agrégée et les percentiles, malgré une saturation importante de l’injecteur. Les captures Grafana montrent systématiquement que REST conserve le meilleur débit de requêtes et la latence de queue la plus basse dans le scénario unitaire; JSON-RPC suit, tandis que GraphQL et gRPC plafonnent plus tôt dans cette configuration. Cette observation est répétée, mais les valeurs exactes par protocole ne doivent pas être reconstruites à partir de l’agrégat JSON.
+Les cinq runs sont donc relativement cohérents sur la durée agrégée et les percentiles, malgré une saturation importante de l’injecteur. Les valeurs de la colonne « Moyenne des 5 runs » sont des moyennes des résumés de chaque run; elles ne constituent pas un recalcul poolé de toutes les observations individuelles. Les captures Grafana montrent systématiquement que REST conserve le meilleur débit de requêtes et la latence de queue la plus basse dans le scénario unitaire; JSON-RPC suit, tandis que GraphQL et gRPC plafonnent plus tôt dans cette configuration. Cette observation est répétée, mais les valeurs exactes par protocole ne doivent pas être reconstruites à partir de l’agrégat JSON.
 
 Le run individuel 3 est utilisé comme capture représentative, car sa durée agrégée (`566,6 ms`) est la plus proche de la médiane des cinq runs. Les quatre autres répertoires restent disponibles pour audit et comparaison.
 
 ![Latence p99 du scénario unitaire](screenshots/individual_run_3/latency_p99.png)
 
-**Figure 3 —** Latence p99 du run individuel représentatif. REST reste le plus bas dans la phase soutenue, alors que GraphQL et gRPC présentent une queue plus élevée.
+**Figure 4 —** Latence p99 du run individuel représentatif. REST reste le plus bas dans la phase soutenue, alors que GraphQL et gRPC présentent une queue plus élevée.
 
 ![Débit du scénario unitaire](screenshots/individual_run_3/requests_per_second.png)
 
-**Figure 4 —** Débit de requêtes du run individuel représentatif. REST atteint le débit de requêtes le plus élevé dans la phase stable visible.
+**Figure 5 —** Débit de requêtes du run individuel représentatif. REST atteint le débit de requêtes le plus élevé dans la phase stable visible.
 
 ![CPU du scénario unitaire](screenshots/individual_run_3/cpu_usage.png)
 
-**Figure 5 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
+**Figure 6 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
 
 ### 9.3. Stabilité agrégée des répétitions par lots
 
@@ -351,19 +369,19 @@ Le run batch 2 est utilisé comme représentation, car sa durée agrégée (`2 8
 
 ![Latence p99 du scénario par lots](screenshots/batch_run_2/latency_p99.png)
 
-**Figure 6 —** Latence p99 du run batch représentatif pour des requêtes de 500 ticks. La séparation entre gRPC et les protocoles textuels est nette.
+**Figure 7 —** Latence p99 du run batch représentatif pour des requêtes de 500 ticks. La séparation entre gRPC et les protocoles textuels est nette.
 
 ![Débit de ticks du scénario par lots](screenshots/batch_run_2/batch_ticks_per_second.png)
 
-**Figure 7 —** Débit de ticks du run batch représentatif. gRPC traite le plus grand nombre de ticks par seconde à charge CPU comparable.
+**Figure 8 —** Débit de ticks du run batch représentatif. gRPC traite le plus grand nombre de ticks par seconde à charge CPU comparable.
 
 ![CPU du scénario par lots](screenshots/batch_run_2/cpu_usage.png)
 
-**Figure 8 —** Utilisation CPU du run batch représentatif. Les quatre serveurs atteignent la zone de 25 %, mais leur travail utile par unité de CPU diffère.
+**Figure 9 —** Utilisation CPU du run batch représentatif. Les quatre serveurs atteignent la zone de 25 %, mais leur travail utile par unité de CPU diffère.
 
 ![Taux d’erreur du scénario par lots](screenshots/batch_run_2/error_rate.png)
 
-**Figure 9 —** Taux d’erreur du run batch représentatif. Les quatre séries restent à 0 % pendant la période observée.
+**Figure 10 —** Taux d’erreur du run batch représentatif. Les quatre séries restent à 0 % pendant la période observée.
 
 ### 9.4. Résultats de débit et changement de classement
 
@@ -524,7 +542,7 @@ flowchart TD
 	I -- Non --> G
 ```
 
-**Figure 10 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
+**Figure 11 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
 
 ### 11.8. Limite de cette analyse
 
@@ -703,6 +721,12 @@ La démarche recommandée est donc de caractériser la charge critique, d’éta
 La réponse finale à la question de recherche est la suivante : dans l’environnement et les scénarios étudiés, le gain mécanique de gRPC ne justifie pas son coût supplémentaire pour le micro-message unitaire; il devient défendable pour un lot de 500 ticks sous contrainte CPU, car le gain de débit et de latence est alors nettement visible. Le seuil précis reste à mesurer avec des tailles intermédiaires, par exemple 10, 50, 100 et 250 ticks, si une localisation plus fine est nécessaire.
 
 Une étude future pourrait également extraire directement les séries Prometheus par protocole, mesurer séparément les étapes de parsing et de désérialisation, comparer plusieurs environnements matériels et évaluer l’opérabilité au moyen de scénarios de diagnostic et d’évolution de contrats. Ces extensions renforceraient la portée des résultats, mais elles ne sont pas nécessaires pour soutenir la conclusion conditionnelle du présent rapport.
+
+## Déclaration d’utilisation de l’IA
+
+Des outils d’intelligence artificielle générative ont été utilisés comme assistants dans ce projet. Leur utilisation a porté sur l’exploration de formulations, la structuration du rapport, la révision linguistique, la génération et la vérification de scripts auxiliaires, ainsi que l’organisation de l’analyse des résultats.
+
+L’IA n’a pas constitué une source de preuve expérimentale. Les mesures présentées dans ce rapport proviennent des exécutions k6, des fichiers JSON conservés dans le dépôt et des métriques/captures Grafana. Les références ont été vérifiées séparément à partir des documents et pages officielles citées. L’auteur demeure responsable du code, du protocole, de l’interprétation des données, des décisions architecturales et de la rédaction finale, et doit être en mesure de défendre chacun de ces éléments.
 
 ## 15. Références
 
