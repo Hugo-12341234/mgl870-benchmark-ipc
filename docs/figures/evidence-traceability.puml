@@ -1,0 +1,53 @@
+@startuml "MGL870 - Traçabilité des preuves"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 90
+skinparam ranksep 100
+skinparam defaultFontName Arial
+left to right direction
+
+title "MGL870 — Traçabilité entre question, mesures et décision"
+
+package "Question architecturale" #FFF3E0 {
+  component "Point de bascule\n1 tick vs 500 ticks" as Question
+}
+
+package "Mesures quantitatives" #E6F7FF {
+  component "k6\nlatence, débit, erreurs" as K6
+  component "Prometheus / Grafana\nCPU, mémoire, réseau" as Observability
+  component "JSON des 10 runs" as Json
+}
+
+package "Observations" #E2FFCC {
+  component "REST favorisé\nscénario unitaire" as SingleResult
+  component "gRPC favorisé\nscénario batch" as BatchResult
+  component "Saturation CPU\n~25 % par conteneur" as CpuResult
+}
+
+package "Décision architecturale" #FFECB3 {
+  component "Choix conditionnel\nperformance vs opérabilité" as Decision
+  artifact "ADR-001 à ADR-007" as Adrs
+}
+
+Question --> K6 : protocole
+Question --> Observability : ressources
+K6 --> Json : résultats bruts
+K6 --> SingleResult : scénario 1 tick
+K6 --> BatchResult : scénario 500 ticks
+Observability --> CpuResult
+Json --> SingleResult : stabilité inter-runs
+Json --> BatchResult : répétitions
+SingleResult --> Decision
+BatchResult --> Decision
+CpuResult --> Decision
+Decision --> Adrs : décision traçable
+
+legend right
+Chaque conclusion importante est reliée à une mesure,
+une observation et une décision documentée. Les coûts
+d’opérabilité et de couplage restent qualitatifs.
+end legend
+@enduml

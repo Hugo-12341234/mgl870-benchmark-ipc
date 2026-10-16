@@ -1,64 +1,72 @@
 @startuml "MGL870 - Vue Composants"
 !theme plain
 skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
 skinparam linetype ortho
 skinparam shadowing false
-skinparam componentStyle rectangle
-skinparam ArrowThickness 2
-skinparam defaultTextAlignment center
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 90
+skinparam ranksep 120
 skinparam defaultFontName Arial
+left to right direction
 
 title "MGL870 — Diagramme de Composants du Banc d’Essai"
 
-package "Génération de charge" #LightBlue {
-  component "Scénario unitaire\nload_test.js" as Single
-  component "Scénario par lots\nload_test_batch.js" as Batch
+package "Clients de test" #E6F7FF {
+  [Scénario unitaire\nload_test.js] as Single
+  [Scénario batch\nload_test_batch.js] as Batch
 }
 
-package "Serveurs Rust évalués" #LightGreen {
-  component "REST Router\nAxum" as Rest
-  component "GraphQL Schema\nasync-graphql" as Graphql
-  component "JSON-RPC Handler\njsonrpsee + serde_json" as JsonRpc
-  component "gRPC Service\ntonic + prost" as Grpc
-  component "Modèle Tick\nsymbol, price, volume, timestamp" as Tick
-  component "Traitement commun\ndésérialisation + ACK" as Processing
+package "Adaptateurs de protocole" #FFECB3 {
+  [REST Adapter\nAxum + JSON] as Rest
+  [GraphQL Adapter\nasync-graphql] as Graphql
+  [JSON-RPC Adapter\njsonrpsee + JSON] as JsonRpc
+  [gRPC Adapter\ntonic + Protobuf] as Grpc
 }
 
-package "Observabilité" #LightYellow {
-  component "Métriques k6\nlatence, débit, erreurs" as K6Metrics
-  component "cAdvisor / docker-metrics\nCPU, mémoire, réseau" as ContainerMetrics
-  component "Prometheus\nstockage et requêtes" as Prometheus
-  component "Grafana\ndashboards" as Grafana
+package "Contrat expérimental" #FFF3E0 {
+  interface "Tick / TickList" as TickContract
+  [Désérialisation\net acquittement] as Processing
 }
 
-Single --> Rest : Tick
-Single --> Graphql : mutation
-Single --> JsonRpc : méthode
-Single --> Grpc : RPC
-Batch --> Rest : Tick[]
-Batch --> Graphql : mutation batch
-Batch --> JsonRpc : params Tick[]
-Batch --> Grpc : TickList
+package "Observabilité" #E2FFCC {
+  [Métriques k6\nlatence, débit, erreurs] as K6Metrics
+  [Métriques conteneurs\ncAdvisor + docker-metrics] as ContainerMetrics
+  [Prometheus\nstockage et requêtes] as Prometheus
+  [Grafana\ndashboards] as Grafana
+}
 
-Rest --> Tick
-Graphql --> Tick
-JsonRpc --> Tick
-Grpc --> Tick
-Rest --> Processing
-Graphql --> Processing
-JsonRpc --> Processing
-Grpc --> Processing
+Single ..> Rest : requête Tick
+Single ..> Graphql : mutation
+Single ..> JsonRpc : méthode
+Single ..> Grpc : RPC
+Batch ..> Rest : tableau Tick
+Batch ..> Graphql : mutation batch
+Batch ..> JsonRpc : params Tick[]
+Batch ..> Grpc : TickList
 
-Single --> K6Metrics
-Batch --> K6Metrics
+Rest --> TickContract
+Graphql --> TickContract
+JsonRpc --> TickContract
+Grpc --> TickContract
+TickContract --> Processing
+
+Single ..> K6Metrics
+Batch ..> K6Metrics
 ContainerMetrics --> Prometheus
 K6Metrics --> Prometheus
 Prometheus --> Grafana
 
+note bottom of Processing
+Traitement identique pour les quatre variantes :
+désérialisation en mémoire puis réponse de succès.
+end note
+
 legend right
-Chaque protocole possède un point d’entrée distinct,
-mais le modèle de données et le traitement final sont communs.
-Les implémentations sont déployées dans des conteneurs séparés.
+Les adaptateurs isolent les différences de transport,
+d’interface et de sérialisation. Le contrat expérimental
+et le traitement commun restent volontairement minimaux.
 endlegend
 
 @enduml

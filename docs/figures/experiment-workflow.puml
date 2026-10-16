@@ -1,0 +1,49 @@
+@startuml "MGL870 - Workflow expérimental"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 70
+skinparam ranksep 90
+skinparam defaultFontName Arial
+
+title "MGL870 — Workflow expérimental reproductible"
+
+start
+:Construire l’image Rust;
+:Créer le réseau Docker
+et les quatre serveurs;
+:Appliquer 0,25 vCPU
+et 512 MiB par serveur;
+
+if (Scénario ?) then (Unitaire)
+  :Charger load_test.js;
+  :2 000 -> 4 000 -> 6 000 req/s;
+  :10 minutes;
+else (Batch)
+  :Charger load_test_batch.js;
+  :100 -> 500 -> 500 req/s;
+  :7 minutes;
+endif
+
+:Exécuter REST, GraphQL,
+JSON-RPC et gRPC en parallèle;
+:Collecter latence, débit,
+erreurs et itérations;
+:Collecter CPU, mémoire
+et réseau;
+:Exporter le JSON du run;
+:Capturer Grafana;
+:Redémarrer l’environnement;
+
+if (5 répétitions réalisées ?) then (Non)
+  :Rejouer le scénario;
+else (Oui)
+  :Consolider moyenne,
+min, max et tendances;
+  :Comparer les protocoles;
+  :Analyser les compromis;
+endif
+stop
+@enduml

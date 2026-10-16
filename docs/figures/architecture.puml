@@ -13,11 +13,8 @@ title "MGL870 — Diagramme de Déploiement du Banc d’Essai"
 
 ' ========== LOAD GENERATION LAYER ==========
 node "Générateur de charge" as LoadGenerator {
-  node "Conteneur: k6-single\n(k6)" as K6Single {
-    artifact "load_test.js"
-  }
-  node "Conteneur: k6-batch\n(k6)" as K6Batch {
-    artifact "load_test_batch.js"
+  node "Conteneur: k6\n(k6 single + batch)" as K6 {
+    artifact "load_test.js\nload_test_batch.js"
   }
 }
 
@@ -45,18 +42,12 @@ node "Docker Host" as Docker {
 
     ' ========== OBSERVABILITY LAYER ==========
     package "Monitoring et observabilité" as MonitoringLayer #LightYellow {
+      node "Collecteur conteneurs\ncAdvisor + docker-metrics" as ContainerMetricsC {
+        artifact "Métriques CPU, mémoire, réseau"
+      }
       node "Conteneur: prometheus\nPrometheus" as PrometheusC {
         artifact "prometheus.yml"
       }
-
-      node "Conteneur: cadvisor\ncAdvisor" as CAdvisorC {
-        artifact "Métriques Docker"
-      }
-
-      node "Conteneur: docker-metrics\nPython" as DockerMetricsC {
-        artifact "docker_metrics.py"
-      }
-
       node "Conteneur: grafana\nGrafana" as GrafanaC {
         artifact "Dashboards JSON"
       }
@@ -65,27 +56,19 @@ node "Docker Host" as Docker {
 }
 
 ' ========== LOAD FLOWS ==========
-K6Single --> RestC : HTTP POST\n/api/ticks
-K6Single --> GraphQLC : HTTP POST\n/graphql
-K6Single --> JsonRpcC : HTTP POST\n/jsonrpc
-K6Single --> GrpcC : gRPC\nIngestTick
-
-K6Batch --> RestC : HTTP POST\n/api/ticks/batch
-K6Batch --> GraphQLC : HTTP POST\ningestTickBatch
-K6Batch --> JsonRpcC : HTTP POST\ningest_tick_batch
-K6Batch --> GrpcC : gRPC\nIngestTickBatch
+K6 --> RestC : unitaire / batch\nHTTP + JSON
+K6 --> GraphQLC : unitaire / batch\nHTTP + JSON
+K6 --> JsonRpcC : unitaire / batch\nHTTP + JSON-RPC
+K6 --> GrpcC : unitaire / batch\nHTTP/2 + Protobuf
 
 ' ========== METRICS FLOWS ==========
-CAdvisorC --> PrometheusC : Scrape CPU / mémoire
-DockerMetricsC --> PrometheusC : Métriques conteneurs
-K6Single --> PrometheusC : Remote write\nlatence / débit / erreurs
-K6Batch --> PrometheusC : Remote write\nlatence / débit / erreurs
+ContainerMetricsC --> PrometheusC : CPU / mémoire / réseau
+K6 --> PrometheusC : latence / débit / erreurs
 PrometheusC --> GrafanaC : PromQL / dashboards
 
 ' ========== LAYOUT HINTS ==========
 LoadGenerator -[hidden]down-> Docker
 ServiceLayer -[hidden]down-> MonitoringLayer
-K6Single -[hidden]down-> K6Batch
 RestC -[hidden]right-> GraphQLC
 GraphQLC -[hidden]right-> JsonRpcC
 JsonRpcC -[hidden]right-> GrpcC

@@ -1,0 +1,56 @@
+@startuml "MGL870 - Packages Rust"
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle uml2
+skinparam linetype ortho
+skinparam shadowing false
+skinparam ArrowColor #606060
+skinparam FontColor #404040
+skinparam nodesep 80
+skinparam ranksep 100
+skinparam defaultFontName Arial
+left to right direction
+
+title "MGL870 — Organisation des packages Rust"
+
+package "mgl870-benchmark-ipc" {
+  [main.rs] as Main
+  [models.rs\nTick] as Models
+
+  package "rest" #E6F7FF {
+    [Router REST\nAxum] as Rest
+  }
+  package "graphql" #E6F7FF {
+    [Schema et mutations\nasync-graphql] as Graphql
+  }
+  package "jsonrpc" #E6F7FF {
+    [Handler RPC\njsonrpsee + serde_json] as JsonRpc
+  }
+  package "grpc" #E6F7FF {
+    [Service RPC\ntonic + prost] as Grpc
+    artifact "proto/tick.proto" as Proto
+  }
+}
+
+Main --> Rest : merge router
+Main --> Graphql : merge router
+Main --> JsonRpc : merge router
+Main --> Grpc : tokio::spawn\nport 50051
+Rest --> Models : désérialise Tick
+Graphql --> Models : TickInput
+JsonRpc --> Models : désérialise JSON
+Grpc --> Proto : contrat généré
+Grpc --> Models : TickMessage / TickList
+
+note bottom of Main
+HTTP/1.1 : port 8080
+HTTP/2 : port 50051
+end note
+
+legend right
+Le même binaire Rust expose les trois routeurs HTTP
+et démarre le service gRPC. Chaque package conserve
+la logique propre à son protocole, tandis que le modèle
+Tick et le contrat proto définissent les données comparées.
+end legend
+@enduml

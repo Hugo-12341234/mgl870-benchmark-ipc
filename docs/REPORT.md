@@ -161,21 +161,9 @@ Le déploiement comprend quatre services évalués, un générateur de charge k6
 
 Le générateur k6 enregistre la durée des requêtes, le nombre de requêtes, les erreurs et le taux d’erreur avec des métriques séparées par protocole. Les métriques système permettent de relier ces mesures applicatives à l’utilisation des conteneurs. Le diagramme de déploiement documente l’organisation du banc d’essai sur l’hôte Docker : les conteneurs de génération de charge, les quatre conteneurs évalués, le réseau Docker commun et la couche d’observabilité. Le fichier source PlantUML versionné, qui constitue la représentation complète destinée au rendu final, est disponible dans [`docs/figures/architecture.puml`](figures/architecture.puml).
 
-```mermaid
-flowchart LR
-	K6[k6\nscénarios unitaire et lot 500] --> R[REST\nHTTP/1.1 + JSON]
-	K6 --> G[GraphQL\nHTTP/1.1 + JSON]
-	K6 --> J[JSON-RPC\nHTTP/1.1 + JSON]
-	K6 --> P[gRPC\nHTTP/2 + Protobuf]
-	R --> M[Prometheus]
-	G --> M
-	J --> M
-	P --> M
-	C[cAdvisor et métriques Docker] --> M
-	M --> F[Grafana]
-```
+![Diagramme de déploiement du banc d’essai](figures/architecture.png)
 
-**Figure 1 —** Vue simplifiée du diagramme de déploiement du banc d’essai. Les quatre services évalués sont déployés comme des conteneurs distincts dans le réseau Docker `mgl870-benchmark`, chacun soumis à la même limite CPU; les conteneurs k6 génèrent la charge et la chaîne Prometheus/cAdvisor/Grafana collecte et visualise les mesures.
+**Figure 1 —** Diagramme de déploiement du banc d’essai. Le générateur k6 se trouve en amont des quatre conteneurs évalués; le réseau Docker les regroupe avec la chaîne d’observabilité. Les flèches de requêtes distinguent les endpoints REST, GraphQL, JSON-RPC et gRPC, tandis que les flèches de métriques montrent le chemin vers Prometheus et Grafana. Cette figure est l’export du fichier source [`docs/figures/architecture.puml`](figures/architecture.puml).
 
 ### 6.4. Contexte d’interprétation
 
@@ -193,7 +181,11 @@ Le scénario k6 unitaire appelle les opérations d’ingestion d’un seul tick.
 
 La couche d’observabilité est séparée du chemin fonctionnel évalué. k6 enregistre les durées, les requêtes et les erreurs, puis écrit les métriques vers Prometheus. cAdvisor et `docker-metrics` exposent les métriques de ressources des conteneurs. Grafana interroge Prometheus pour afficher la consommation CPU, la mémoire, le réseau, le débit et les percentiles de latence. Cette séparation permet de mettre en relation une mesure applicative avec l’état de la ressource sans ajouter un traitement métier aux serveurs évalués.
 
-Le diagramme de déploiement complet est versionné dans [`docs/figures/architecture.puml`](figures/architecture.puml). Il représente l’hôte Docker, le réseau, les conteneurs, leurs artefacts et les flux de requêtes et de métriques. La vue Mermaid intégrée en section 6 en est un rendu simplifié destiné à rester lisible directement dans le Markdown; elle ne constitue pas un second modèle architectural.
+Le diagramme de déploiement complet est versionné dans [`docs/figures/architecture.puml`](figures/architecture.puml) et présenté en Figure 1. L’image exportée est la vue de référence du rapport; le fichier PlantUML reste la source modifiable.
+
+Un diagramme de packages complète cette vue de déploiement en décrivant l’organisation interne du binaire Rust. Il montre que `main.rs` assemble les routeurs HTTP, démarre le service gRPC, et que les modules de protocole convergent vers le modèle `Tick` sans partager une logique d’adaptation artificielle. La source est disponible dans [`docs/figures/packages.puml`](figures/packages.puml).
+
+**Figure à ajouter après ce paragraphe —** Organisation des packages Rust du serveur expérimental. Cette figure est utile ici, car elle explique la structure logicielle interne qui soutient l’architecture déployée; elle ne doit pas être confondue avec le diagramme de déploiement.
 
 ### 7.2. Vue des composants logiciels
 
@@ -201,30 +193,11 @@ Chaque variante possède un adaptateur propre à son protocole et converge vers 
 
 Cette architecture ne constitue pas une abstraction logicielle unique qui normaliserait les quatre protocoles derrière une interface interne commune. La convergence se fait au niveau du modèle et du comportement attendu, tandis que les étapes de transport et de désérialisation restent propres à chaque implémentation. Ce choix est important pour l’expérience : une couche d’adaptation supplémentaire aurait pu réduire les différences observables ou introduire un coût commun non pertinent.
 
-Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml). Il montre les deux scénarios de charge, les quatre points d’entrée, le modèle `Tick`, le traitement commun et les composants d’observabilité. Les blocs Mermaid intégrés dans cette section sont des rendus portables et simplifiés pour la lecture directe du Markdown; les fichiers PlantUML constituent les sources détaillées et versionnées destinées à la génération des figures finales.
+Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml) et présenté en Figure 2. Sa disposition sépare les adaptateurs, le contrat expérimental, le traitement commun et l’observabilité afin de limiter les croisements visuels.
 
-```mermaid
-flowchart TB
-	S[Scénarios k6] --> R[REST / Axum]
-	S --> G[GraphQL / async-graphql]
-	S --> J[JSON-RPC / jsonrpsee]
-	S --> P[gRPC / tonic + prost]
-	R --> T[Modèle Tick]
-	G --> T
-	J --> T
-	P --> T
-	T --> A[Acquittement de succès]
-	S --> O[Métriques k6]
-	R -.-> C[Métriques conteneurs]
-	G -.-> C
-	J -.-> C
-	P -.-> C
-	O --> Prom[Prometheus]
-	C --> Prom
-	Prom --> Graf[Grafana]
-```
+![Diagramme de composants du banc d’essai](figures/components.png)
 
-**Figure 2 —** Composants logiciels et convergence vers le modèle de données commun. Les quatre adaptateurs restent distincts jusqu’à la désérialisation, ce qui préserve la comparabilité du coût protocolaire.
+**Figure 2 —** Diagramme de composants du banc d’essai. Les scénarios k6 appellent quatre adaptateurs séparés; ceux-ci convergent vers le modèle `Tick` et le traitement minimal. La chaîne d’observabilité est isolée afin de ne pas confondre le chemin fonctionnel évalué avec la collecte des métriques. Cette figure est l’export du fichier source [`docs/figures/components.puml`](figures/components.puml).
 
 ### 7.3. Séquence d’une requête
 
@@ -232,23 +205,11 @@ Dans les deux scénarios, k6 construit le payload, l’envoie au point d’entr�
 
 Après la désérialisation, aucun calcul métier ni accès externe n’est réalisé. Le serveur retourne immédiatement un succès. Cette séquence est volontairement courte : elle permet d’étudier la frontière de communication, mais elle exclut les coûts qui apparaîtraient dans une application complète. Le diagramme de séquence détaillé est versionné dans [`docs/figures/sequence-ingestion.puml`](figures/sequence-ingestion.puml).
 
-```mermaid
-sequenceDiagram
-	participant K as k6
-	participant T as Transport
-	participant E as Point d’entrée
-	participant D as Désérialiseur
-	participant P as Traitement commun
-	K->>T: Envoie un tick ou un lot de 500 ticks
-	T->>E: Requête reçue
-	E->>D: Décode JSON ou Protobuf
-	D-->>E: Tick ou TickList en mémoire
-	E->>P: Transmet la structure
-	P-->>E: Succès
-	E-->>K: HTTP 200 ou ACK
-```
+![Diagramme de séquence d’une ingestion](figures/sequence-ingestion.png)
 
-**Figure 3 —** Séquence commune d’une ingestion. Les variantes diffèrent principalement par le transport et le désérialiseur; le traitement applicatif après décodage est volontairement identique et minimal.
+**Figure 3 —** Diagramme de séquence d’une ingestion. k6 envoie un tick ou un lot, le transport remet la requête au point d’entrée, puis le désérialiseur produit une structure en mémoire avant l’acquittement. L’alternative distingue le parsing JSON des variantes textuelles du décodage Protobuf de gRPC. Cette figure est l’export du fichier source [`docs/figures/sequence-ingestion.puml`](figures/sequence-ingestion.puml).
+
+Ces trois vues architecturales sont complémentaires : le déploiement montre où les éléments s’exécutent, les packages montrent comment le code est organisé, et la séquence montre comment une requête traverse le système. Elles répondent ainsi à des questions différentes sans répéter le même schéma.
 
 ### 7.4. Décisions architecturales documentées par ADR
 
@@ -266,7 +227,123 @@ Les décisions importantes sont conservées comme des ADRs dans `docs/adr/`. Ell
 
 Ces décisions forment une chaîne cohérente. Le choix des quatre protocoles définit les alternatives; le traitement minimal limite les variables parasites; la contrainte CPU rend les différences observables; les scénarios et l’observabilité produisent les preuves nécessaires à la comparaison.
 
-### 7.5. Conséquences architecturales des décisions
+### 7.5. ADRs complets
+
+Les ADRs sont conservés séparément dans `docs/adr/` pour faciliter leur maintenance, mais leur contenu complet est reproduit ici afin que le rapport final soit autonome.
+
+#### ADR-001 — Comparer quatre protocoles d’ingestion
+
+**Statut :** Acceptée. **Date :** 2026-10-07. **Décideurs :** Projet MGL870.
+
+**Contexte.** Le projet doit étudier une décision architecturale mesurable concernant la communication inter-processus dans un scénario d’ingestion à haute fréquence. Une seule technologie ne permettrait pas d’observer les compromis entre interface orientée ressource, appel de procédure, requêtage dynamique, sérialisation textuelle et sérialisation binaire.
+
+**Décision.** Comparer REST, JSON-RPC, GraphQL et gRPC dans un même banc d’essai, avec un traitement applicatif minimal et deux tailles de charge utile : un tick unitaire et un lot de 500 ticks.
+
+**Options considérées.** Évaluer uniquement REST et gRPC; comparer les quatre protocoles retenus; ajouter d’autres technologies comme WebSocket ou un broker de messages.
+
+**Justification.** REST fournit la baseline textuelle orientée ressource, JSON-RPC représente l’appel de procédure textuel, GraphQL une interface dynamique, et gRPC l’appel fortement contractuel et binaire. Cette couverture reste réalisable.
+
+**Conséquences.** La comparaison est plus informative, mais exige de contrôler les implémentations, les charges, les ressources et les métriques. Les conclusions restent limitées aux protocoles, bibliothèques et scénarios étudiés.
+
+**Preuves attendues.** Résultats k6, mesures Prometheus/cAdvisor et captures Grafana.
+
+#### ADR-002 — Isoler le coût de communication par un traitement minimal en Rust
+
+**Statut :** Acceptée. **Date :** 2026-10-07. **Décideurs :** Projet MGL870.
+
+**Contexte.** Une logique métier, une base de données ou une persistance durable pourraient masquer les différences entre protocoles.
+
+**Décision.** Implémenter les quatre variantes dans le même projet Rust, sans base de données ni logique métier. Chaque endpoint désérialise un tick ou un lot et retourne un succès.
+
+**Options considérées.** Application métier complète; traitement minimal commun; applications différentes propres à chaque protocole.
+
+**Justification.** Le traitement minimal réduit les variables parasites et rend les écarts plus directement attribuables à la communication.
+
+**Conséquences.** La validité interne est favorisée, mais les résultats ne représentent pas un système financier complet ni les coûts d’une base de données ou d’une validation métier.
+
+**Preuves attendues.** Code source, modèle `Tick`, contrat `tick.proto` et scripts k6.
+
+#### ADR-003 — Imposer une limite commune de 0,25 vCPU
+
+**Statut :** Acceptée. **Date :** 2026-10-07. **Décideurs :** Projet MGL870.
+
+**Contexte.** Les tests initiaux pouvaient être limités par la virtualisation réseau plutôt que par le coût de traitement; une machine non contrainte pouvait masquer les différences.
+
+**Décision.** Limiter chaque conteneur à `0,25` vCPU et 512 MiB dans Docker Compose, avec suivi par cAdvisor et les métriques Docker.
+
+**Options considérées.** Aucune limite; limite élevée; limite stricte et identique aux quatre variantes.
+
+**Justification.** Une limite commune crée une saturation contrôlée et rend les coûts relatifs visibles sans favoriser un protocole.
+
+**Conséquences.** La configuration est utile pour un environnement contraint, mais Windows, WSL2/Hyper-V et la virtualisation réseau restent des menaces à la validité.
+
+**Preuves attendues.** `docker-compose.yml` et captures Grafana montrant le plafonnement proche de 25 %.
+
+#### ADR-004 — Utiliser deux scénarios k6 et une observabilité centralisée
+
+**Statut :** Acceptée. **Date :** 2026-10-07. **Décideurs :** Projet MGL870.
+
+**Contexte.** La question porte sur l’effet du volume de payload; il faut comparer un appel individuel et une ingestion par lot avec les ressources observées.
+
+**Décision.** Utiliser `load_test.js` pour un tick et `load_test_batch.js` pour 500 ticks, avec `ramping-arrival-rate`, export JSON, Prometheus, cAdvisor, `docker-metrics` et Grafana.
+
+**Options considérées.** Appels unitaires seulement; lots seulement; deux tailles avec télémétrie commune.
+
+**Justification.** Deux tailles permettent de tester un point de bascule et de relier mesures applicatives et ressources.
+
+**Conséquences.** Les deux scénarios ne couvrent pas les tailles intermédiaires; le seuil doit être présenté comme une borne.
+
+**Preuves attendues.** Scripts k6, JSON, dashboards et captures Grafana.
+
+#### ADR-005 — Utiliser Rust pour les serveurs évalués
+
+**Statut :** Acceptée. **Date :** 2026-10-16. **Décideurs :** Projet MGL870.
+
+**Contexte.** Le langage peut introduire du bruit par la gestion mémoire, le ramasse-miettes, l’exécution et les bibliothèques.
+
+**Décision.** Utiliser Rust pour les quatre serveurs, avec Axum, async-graphql, jsonrpsee et tonic/prost.
+
+**Options considérées.** Langage différent par protocole; même langage système; langage géré avec ramasse-miettes.
+
+**Justification.** Un langage commun réduit les variations; Rust fournit une exécution native sans ramasse-miettes et les bibliothèques nécessaires.
+
+**Conséquences.** Les résultats ne se généralisent pas automatiquement à Java, Go, C# ou d’autres bibliothèques. Le langage est une constante, pas une variable étudiée.
+
+**Preuves disponibles.** Code source, `Cargo.toml`, `Cargo.lock`, `Dockerfile` et modules des serveurs.
+
+#### ADR-006 — Définir des profils de charge soutenue avec k6
+
+**Statut :** Acceptée. **Date :** 2026-10-16. **Décideurs :** Projet MGL870.
+
+**Contexte.** Un pic instantané ne distingue pas une variation transitoire d’une saturation soutenue.
+
+**Décision.** Utiliser `ramping-arrival-rate`: unitaire à 2 000, 4 000 puis 6 000 req/s sur 10 minutes; batch à 100 puis 500 req/s sur 7 minutes, avec six minutes au palier 500. Les VUs sont préalloués au maximum.
+
+**Options considérées.** Charge constante; pic court; montée progressive suivie d’un plateau.
+
+**Justification.** La montée montre la dégradation et le plateau rend la saturation mesurable dans le temps. Les durées restent répétables cinq fois.
+
+**Conséquences.** Les profils mesurent une capacité soutenue et non une rafale ni un seuil continu exact; le point de bascule est encadré entre 1 et 500 ticks.
+
+**Preuves disponibles.** Scripts k6, dix JSON, captures Grafana et ADRs.
+
+#### ADR-007 — Centraliser l’observabilité et conserver les artefacts
+
+**Statut :** Acceptée. **Date :** 2026-10-16. **Décideurs :** Projet MGL870.
+
+**Contexte.** Une comparaison est difficile à défendre sans relier latence et débit aux ressources ni conserver les données sources.
+
+**Décision.** Utiliser k6, Prometheus, cAdvisor, `docker-metrics` et Grafana, et conserver scripts, Docker Compose, `.proto`, JSON, captures, dashboards et sources PlantUML.
+
+**Options considérées.** Résumés k6 seulement; captures manuelles seulement; combinaison des sources et de la télémétrie.
+
+**Justification.** La combinaison vérifie les checks, la saturation, les tendances temporelles et la stabilité inter-runs.
+
+**Conséquences.** Le dépôt contient plus d’artefacts, mais les captures illustrent tandis que JSON et séries Prometheus vérifient quantitativement.
+
+**Preuves disponibles.** `results/`, `docs/screenshots/`, `grafana/`, `tests/`, `proto/`, `docs/figures/` et `docs/adr/`.
+
+### 7.6. Conséquences architecturales des décisions
 
 L’architecture favorise la validité interne de la comparaison au prix d’une représentativité réduite d’un système de production. Les variantes sont comparables parce qu’elles exécutent peu de logique et disposent de la même limite de ressources. En revanche, les résultats ne mesurent pas l’effet d’une base de données, d’une logique métier, de la sécurité TLS, de la découverte de services ou d’un déploiement multi-hôtes.
 
@@ -281,6 +358,8 @@ L’étude adopte une comparaison contrôlée à deux facteurs principaux : le p
 Deux séries indépendantes de cinq répétitions ont été réalisées : cinq runs du scénario unitaire et cinq runs du scénario par lots. Les fichiers `k6_results_run1.json` à `k6_results_run5.json` et `k6_batch_results_run1.json` à `k6_batch_results_run5.json` sont conservés dans `results/`. Les captures Grafana correspondantes sont classées dans `docs/screenshots/individual_run_1/` à `individual_run_5/` et `docs/screenshots/batch_run_1/` à `batch_run_5/`.
 
 Les répétitions servent à mesurer la stabilité des tendances, et non à prétendre à une inférence statistique générale. Les résultats sont synthétisés par moyenne, médiane, minimum et maximum entre les runs pour les métriques agrégées; les captures représentatives sont choisies selon une règle a priori décrite en section 9. Les résultats par protocole restent issus des séries Grafana, car le résumé JSON n’exporte pas les percentiles de la métrique personnalisée séparément pour chaque tag `protocol`.
+
+Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, démarrage de l’environnement, application de la limite CPU, sélection du scénario, exécution des quatre protocoles, collecte des métriques, archivage du JSON et des captures, redémarrage, puis consolidation des cinq répétitions. **Figure à ajouter dans cette sous-section —** Workflow expérimental reproductible. Cette figure rend la méthodologie plus facile à vérifier qu’une simple description linéaire.
 
 ### 8.2. Scénario unitaire
 
@@ -423,6 +502,8 @@ Pour un lot de 500 ticks, gRPC devient la meilleure décision de performance. Le
 
 La conclusion défendable est donc conditionnelle : **gRPC est justifiable lorsque la charge utile est suffisamment importante pour rendre le coût de parsing textuel déterminant; pour les micro-messages, REST demeure préférable lorsque la simplicité et l’opérabilité ont une valeur supérieure au gain mécanique potentiel.** Avec les données disponibles, le point de bascule est encadré entre 1 et 500 ticks par requête, mais il n’est pas localisé à l’intérieur de cet intervalle.
 
+La traçabilité de cette conclusion est représentée dans [`docs/figures/evidence-traceability.puml`](figures/evidence-traceability.puml). **Figure à ajouter après ce paragraphe —** Traçabilité entre la question architecturale, les mesures k6 et Prometheus/Grafana, les observations, puis les ADRs et la décision finale. Cette figure est particulièrement pertinente dans la section 10, car elle montre que la conclusion ne repose pas sur une préférence technologique isolée : elle relie explicitement la question, les données, les observations et la décision.
+
 ### 10.2. Analyse de l’effet de la taille du payload
 
 Le changement de classement entre les deux scénarios est l’observation la plus importante du rapport. Dans le scénario unitaire, le coût fixe de la requête représente une part importante du coût total. La charge utile est trop petite pour que la compacité de Protobuf domine nécessairement l’ensemble du chemin d’exécution. Le transport HTTP/2, la gestion de l’appel RPC et les étapes propres à la pile gRPC peuvent alors peser relativement lourd par rapport au décodage d’un seul tick.
@@ -538,7 +619,7 @@ Le point de bascule doit donc être défini comme une décision économique et o
 
 Une équipe devrait commencer par caractériser le scénario réel : taille et fréquence des messages, criticité de la latence, nombre de consommateurs, fréquence des changements de contrat et capacité des équipes à exploiter des outils spécialisés. Elle devrait ensuite reproduire une mesure représentative, car les résultats de ce projet ne remplacent pas une mesure dans le contexte cible.
 
-L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml). Le bloc Mermaid qui suit en est un rendu portable pour le rapport; il ne constitue pas un diagramme supplémentaire. Il formalise les règles suivantes :
+L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml) et présenté en Figure 11. Il formalise les règles suivantes :
 
 1. pour un payload petit et une forte priorité donnée à la lisibilité, commencer par REST;
 2. pour un appel de procédure textuel et inspectable, considérer JSON-RPC;
@@ -546,19 +627,7 @@ L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures
 4. pour un volume élevé, un contrat stable et une contrainte CPU forte, évaluer gRPC;
 5. adopter gRPC seulement si le gain mesuré compense le coût d’opérabilité et de couplage dans l’organisation cible.
 
-```mermaid
-flowchart TD
-	A[Caractériser la charge réelle] --> B{Payload volumineux ou débit critique ?}
-	B -- Non --> C{Requêtes dynamiques nécessaires ?}
-	C -- Non --> D[REST : simplicité et observabilité]
-	C -- Oui --> E[GraphQL : mesurer le coût du parsing]
-	B -- Oui --> F{CPU critique et communication interne ?}
-	F -- Non --> G[REST ou JSON-RPC selon le style d'interface]
-	F -- Oui --> H[Évaluer gRPC]
-	H --> I{Gain mesuré > coût opérationnel ?}
-	I -- Oui --> J[Adopter gRPC dans ce périmètre]
-	I -- Non --> G
-```
+![Arbre de décision architectural](figures/decision-tradeoffs.png)
 
 **Figure 11 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
 
