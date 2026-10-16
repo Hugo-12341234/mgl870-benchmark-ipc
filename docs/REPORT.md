@@ -185,7 +185,9 @@ Le diagramme de déploiement complet est versionné dans [`docs/figures/architec
 
 Un diagramme de packages complète cette vue de déploiement en décrivant l’organisation interne du binaire Rust. Il montre que `main.rs` assemble les routeurs HTTP, démarre le service gRPC, et que les modules de protocole convergent vers le modèle `Tick` sans partager une logique d’adaptation artificielle. La source est disponible dans [`docs/figures/packages.puml`](figures/packages.puml).
 
-**Figure à ajouter après ce paragraphe —** Organisation des packages Rust du serveur expérimental. Cette figure est utile ici, car elle explique la structure logicielle interne qui soutient l’architecture déployée; elle ne doit pas être confondue avec le diagramme de déploiement.
+![Organisation des packages Rust](figures/packages.png)
+
+**Figure 2 —** Organisation des packages Rust du serveur expérimental. `main.rs` assemble les routeurs HTTP et démarre le service gRPC; les modules de protocole restent séparés et partagent le modèle `Tick` ou le contrat `tick.proto` selon le chemin d’exécution. Cette figure explique la structure logicielle interne qui soutient l’architecture déployée.
 
 ### 7.2. Vue des composants logiciels
 
@@ -193,11 +195,11 @@ Chaque variante possède un adaptateur propre à son protocole et converge vers 
 
 Cette architecture ne constitue pas une abstraction logicielle unique qui normaliserait les quatre protocoles derrière une interface interne commune. La convergence se fait au niveau du modèle et du comportement attendu, tandis que les étapes de transport et de désérialisation restent propres à chaque implémentation. Ce choix est important pour l’expérience : une couche d’adaptation supplémentaire aurait pu réduire les différences observables ou introduire un coût commun non pertinent.
 
-Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml) et présenté en Figure 2. Sa disposition sépare les adaptateurs, le contrat expérimental, le traitement commun et l’observabilité afin de limiter les croisements visuels.
+Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml) et présenté en Figure 3. Sa disposition sépare les adaptateurs, le contrat expérimental, le traitement commun et l’observabilité afin de limiter les croisements visuels.
 
 ![Diagramme de composants du banc d’essai](figures/components.png)
 
-**Figure 2 —** Diagramme de composants du banc d’essai. Les scénarios k6 appellent quatre adaptateurs séparés; ceux-ci convergent vers le modèle `Tick` et le traitement minimal. La chaîne d’observabilité est isolée afin de ne pas confondre le chemin fonctionnel évalué avec la collecte des métriques. Cette figure est l’export du fichier source [`docs/figures/components.puml`](figures/components.puml).
+**Figure 3 —** Diagramme de composants du banc d’essai. Les scénarios k6 appellent quatre adaptateurs séparés; ceux-ci convergent vers le modèle `Tick` et le traitement minimal. La chaîne d’observabilité est isolée afin de ne pas confondre le chemin fonctionnel évalué avec la collecte des métriques. Cette figure est l’export du fichier source [`docs/figures/components.puml`](figures/components.puml).
 
 ### 7.3. Séquence d’une requête
 
@@ -207,7 +209,7 @@ Après la désérialisation, aucun calcul métier ni accès externe n’est réa
 
 ![Diagramme de séquence d’une ingestion](figures/sequence-ingestion.png)
 
-**Figure 3 —** Diagramme de séquence d’une ingestion. k6 envoie un tick ou un lot, le transport remet la requête au point d’entrée, puis le désérialiseur produit une structure en mémoire avant l’acquittement. L’alternative distingue le parsing JSON des variantes textuelles du décodage Protobuf de gRPC. Cette figure est l’export du fichier source [`docs/figures/sequence-ingestion.puml`](figures/sequence-ingestion.puml).
+**Figure 4 —** Diagramme de séquence d’une ingestion. k6 envoie un tick ou un lot, le transport remet la requête au point d’entrée, puis le désérialiseur produit une structure en mémoire avant l’acquittement. L’alternative distingue le parsing JSON des variantes textuelles du décodage Protobuf de gRPC. Cette figure est l’export du fichier source [`docs/figures/sequence-ingestion.puml`](figures/sequence-ingestion.puml).
 
 Ces trois vues architecturales sont complémentaires : le déploiement montre où les éléments s’exécutent, les packages montrent comment le code est organisé, et la séquence montre comment une requête traverse le système. Elles répondent ainsi à des questions différentes sans répéter le même schéma.
 
@@ -359,7 +361,11 @@ Deux séries indépendantes de cinq répétitions ont été réalisées : cinq r
 
 Les répétitions servent à mesurer la stabilité des tendances, et non à prétendre à une inférence statistique générale. Les résultats sont synthétisés par moyenne, médiane, minimum et maximum entre les runs pour les métriques agrégées; les captures représentatives sont choisies selon une règle a priori décrite en section 9. Les résultats par protocole restent issus des séries Grafana, car le résumé JSON n’exporte pas les percentiles de la métrique personnalisée séparément pour chaque tag `protocol`.
 
-Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, démarrage de l’environnement, application de la limite CPU, sélection du scénario, exécution des quatre protocoles, collecte des métriques, archivage du JSON et des captures, redémarrage, puis consolidation des cinq répétitions. **Figure à ajouter dans cette sous-section —** Workflow expérimental reproductible. Cette figure rend la méthodologie plus facile à vérifier qu’une simple description linéaire.
+Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, démarrage de l’environnement, application de la limite CPU, sélection du scénario, exécution des quatre protocoles, collecte des métriques, archivage du JSON et des captures, redémarrage, puis consolidation des cinq répétitions.
+
+![Workflow expérimental reproductible](figures/experiment-workflow.png)
+
+**Figure 5 —** Workflow expérimental reproductible. La figure montre que chaque scénario passe par la même séquence de préparation, exécution, collecte, archivage et répétition avant la consolidation des résultats.
 
 ### 8.2. Scénario unitaire
 
@@ -437,15 +443,15 @@ Le run individuel 3 est utilisé comme capture représentative, car sa durée ag
 
 ![Latence p99 du scénario unitaire](screenshots/individual_run_3/latency_p99.png)
 
-**Figure 4 —** Latence p99 du run individuel représentatif. REST reste le plus bas dans la phase soutenue, alors que GraphQL et gRPC présentent une queue plus élevée.
+**Figure 6 —** Latence p99 du run individuel représentatif. REST reste le plus bas dans la phase soutenue, alors que GraphQL et gRPC présentent une queue plus élevée.
 
 ![Débit du scénario unitaire](screenshots/individual_run_3/requests_per_second.png)
 
-**Figure 5 —** Débit de requêtes du run individuel représentatif. REST atteint le débit de requêtes le plus élevé dans la phase stable visible.
+**Figure 7 —** Débit de requêtes du run individuel représentatif. REST atteint le débit de requêtes le plus élevé dans la phase stable visible.
 
 ![CPU du scénario unitaire](screenshots/individual_run_3/cpu_usage.png)
 
-**Figure 6 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
+**Figure 8 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
 
 ### 9.3. Stabilité agrégée des répétitions par lots
 
@@ -466,19 +472,19 @@ Le run batch 2 est utilisé comme représentation, car sa durée agrégée (`2 8
 
 ![Latence p99 du scénario par lots](screenshots/batch_run_2/latency_p99.png)
 
-**Figure 7 —** Latence p99 du run batch représentatif pour des requêtes de 500 ticks. La séparation entre gRPC et les protocoles textuels est nette.
+**Figure 9 —** Latence p99 du run batch représentatif pour des requêtes de 500 ticks. La séparation entre gRPC et les protocoles textuels est nette.
 
 ![Débit de ticks du scénario par lots](screenshots/batch_run_2/batch_ticks_per_second.png)
 
-**Figure 8 —** Débit de ticks du run batch représentatif. gRPC traite le plus grand nombre de ticks par seconde à charge CPU comparable.
+**Figure 10 —** Débit de ticks du run batch représentatif. gRPC traite le plus grand nombre de ticks par seconde à charge CPU comparable.
 
 ![CPU du scénario par lots](screenshots/batch_run_2/cpu_usage.png)
 
-**Figure 9 —** Utilisation CPU du run batch représentatif. Les quatre serveurs atteignent la zone de 25 %, mais leur travail utile par unité de CPU diffère.
+**Figure 11 —** Utilisation CPU du run batch représentatif. Les quatre serveurs atteignent la zone de 25 %, mais leur travail utile par unité de CPU diffère.
 
 ![Taux d’erreur du scénario par lots](screenshots/batch_run_2/error_rate.png)
 
-**Figure 10 —** Taux d’erreur du run batch représentatif. Les quatre séries restent à 0 % pendant la période observée.
+**Figure 12 —** Taux d’erreur du run batch représentatif. Les quatre séries restent à 0 % pendant la période observée.
 
 ### 9.4. Résultats de débit et changement de classement
 
@@ -502,7 +508,11 @@ Pour un lot de 500 ticks, gRPC devient la meilleure décision de performance. Le
 
 La conclusion défendable est donc conditionnelle : **gRPC est justifiable lorsque la charge utile est suffisamment importante pour rendre le coût de parsing textuel déterminant; pour les micro-messages, REST demeure préférable lorsque la simplicité et l’opérabilité ont une valeur supérieure au gain mécanique potentiel.** Avec les données disponibles, le point de bascule est encadré entre 1 et 500 ticks par requête, mais il n’est pas localisé à l’intérieur de cet intervalle.
 
-La traçabilité de cette conclusion est représentée dans [`docs/figures/evidence-traceability.puml`](figures/evidence-traceability.puml). **Figure à ajouter après ce paragraphe —** Traçabilité entre la question architecturale, les mesures k6 et Prometheus/Grafana, les observations, puis les ADRs et la décision finale. Cette figure est particulièrement pertinente dans la section 10, car elle montre que la conclusion ne repose pas sur une préférence technologique isolée : elle relie explicitement la question, les données, les observations et la décision.
+La traçabilité de cette conclusion est représentée dans [`docs/figures/evidence-traceability.puml`](figures/evidence-traceability.puml).
+
+![Traçabilité des preuves vers la décision](figures/evidence-traceability.png)
+
+**Figure 13 —** Traçabilité entre la question architecturale, les mesures k6 et Prometheus/Grafana, les observations, puis les ADRs et la décision finale. Cette figure montre que la conclusion ne repose pas sur une préférence technologique isolée : elle relie explicitement la question, les données, les observations et la décision.
 
 ### 10.2. Analyse de l’effet de la taille du payload
 
@@ -619,7 +629,7 @@ Le point de bascule doit donc être défini comme une décision économique et o
 
 Une équipe devrait commencer par caractériser le scénario réel : taille et fréquence des messages, criticité de la latence, nombre de consommateurs, fréquence des changements de contrat et capacité des équipes à exploiter des outils spécialisés. Elle devrait ensuite reproduire une mesure représentative, car les résultats de ce projet ne remplacent pas une mesure dans le contexte cible.
 
-L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml) et présenté en Figure 11. Il formalise les règles suivantes :
+L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml) et présenté en Figure 14. Il formalise les règles suivantes :
 
 1. pour un payload petit et une forte priorité donnée à la lisibilité, commencer par REST;
 2. pour un appel de procédure textuel et inspectable, considérer JSON-RPC;
@@ -629,7 +639,7 @@ L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures
 
 ![Arbre de décision architectural](figures/decision-tradeoffs.png)
 
-**Figure 11 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
+**Figure 14 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
 
 ### 11.8. Limite de cette analyse
 
