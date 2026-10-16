@@ -193,7 +193,7 @@ Le scénario k6 unitaire appelle les opérations d’ingestion d’un seul tick.
 
 La couche d’observabilité est séparée du chemin fonctionnel évalué. k6 enregistre les durées, les requêtes et les erreurs, puis écrit les métriques vers Prometheus. cAdvisor et `docker-metrics` exposent les métriques de ressources des conteneurs. Grafana interroge Prometheus pour afficher la consommation CPU, la mémoire, le réseau, le débit et les percentiles de latence. Cette séparation permet de mettre en relation une mesure applicative avec l’état de la ressource sans ajouter un traitement métier aux serveurs évalués.
 
-Le diagramme de déploiement complet est versionné dans [`docs/figures/architecture.puml`](figures/architecture.puml). Il représente l’hôte Docker, le réseau, les conteneurs, leurs artefacts et les flux de requêtes et de métriques. La vue intégrée en section 6 en est une version simplifiée destinée à rester lisible directement dans le Markdown.
+Le diagramme de déploiement complet est versionné dans [`docs/figures/architecture.puml`](figures/architecture.puml). Il représente l’hôte Docker, le réseau, les conteneurs, leurs artefacts et les flux de requêtes et de métriques. La vue Mermaid intégrée en section 6 en est un rendu simplifié destiné à rester lisible directement dans le Markdown; elle ne constitue pas un second modèle architectural.
 
 ### 7.2. Vue des composants logiciels
 
@@ -201,7 +201,7 @@ Chaque variante possède un adaptateur propre à son protocole et converge vers 
 
 Cette architecture ne constitue pas une abstraction logicielle unique qui normaliserait les quatre protocoles derrière une interface interne commune. La convergence se fait au niveau du modèle et du comportement attendu, tandis que les étapes de transport et de désérialisation restent propres à chaque implémentation. Ce choix est important pour l’expérience : une couche d’adaptation supplémentaire aurait pu réduire les différences observables ou introduire un coût commun non pertinent.
 
-Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml). Il montre les deux scénarios de charge, les quatre points d’entrée, le modèle `Tick`, le traitement commun et les composants d’observabilité.
+Le diagramme de composants source est disponible dans [`docs/figures/components.puml`](figures/components.puml). Il montre les deux scénarios de charge, les quatre points d’entrée, le modèle `Tick`, le traitement commun et les composants d’observabilité. Les blocs Mermaid intégrés dans cette section sont des rendus portables et simplifiés pour la lecture directe du Markdown; les fichiers PlantUML constituent les sources détaillées et versionnées destinées à la génération des figures finales.
 
 ```mermaid
 flowchart TB
@@ -260,6 +260,9 @@ Les décisions importantes sont conservées comme des ADRs dans `docs/adr/`. Ell
 | [ADR-002](adr/ADR-002-traitement-minimal-en-rust.md) | Utiliser un traitement minimal commun en Rust | Isoler le coût de communication et de désérialisation |
 | [ADR-003](adr/ADR-003-contrainte-de-ressources.md) | Limiter chaque serveur à `0,25` vCPU | Exposer les coûts sous contrainte CPU contrôlée |
 | [ADR-004](adr/ADR-004-scenarios-et-observabilite.md) | Utiliser deux scénarios k6 et une observabilité centralisée | Relier la taille du payload, les performances et les ressources |
+| [ADR-005](adr/ADR-005-choix-de-rust.md) | Utiliser Rust pour les quatre serveurs | Réduire les variations d’environnement d’exécution |
+| [ADR-006](adr/ADR-006-profiles-de-charge-k6.md) | Utiliser des profils k6 progressifs et soutenus | Observer la montée en saturation et la stabilité |
+| [ADR-007](adr/ADR-007-observabilite-et-reproductibilite.md) | Centraliser les métriques et conserver les artefacts | Rendre les observations auditables et reproductibles |
 
 Ces décisions forment une chaîne cohérente. Le choix des quatre protocoles définit les alternatives; le traitement minimal limite les variables parasites; la contrainte CPU rend les différences observables; les scénarios et l’observabilité produisent les preuves nécessaires à la comparaison.
 
@@ -309,7 +312,22 @@ Un run est conservé lorsqu’il est complet, que les quatre checks applicatifs 
 
 Le protocole est reproductible à partir de [`docker-compose.yml`](../docker-compose.yml), des scripts [`tests/load_test.js`](../tests/load_test.js) et [`tests/load_test_batch.js`](../tests/load_test_batch.js), du contrat [`proto/tick.proto`](../proto/tick.proto), des dashboards Grafana, des dix fichiers JSON et des captures conservées dans le dépôt.
 
-### 8.7. Règle d’interprétation
+### 8.7. Reproductibilité expérimentale
+
+La reproduction complète peut être effectuée à partir du dépôt, de Docker et de Docker Compose. Le protocole suit les étapes suivantes :
+
+1. construire et démarrer l’infrastructure avec `docker compose up -d --build`;
+2. attendre que les quatre serveurs, Prometheus et Grafana soient disponibles;
+3. lancer le scénario unitaire avec `docker compose --profile loadtest run --rm k6-single`;
+4. conserver le fichier `results/k6_results_run1.json` sous un nom correspondant au numéro du run et archiver les captures Grafana dans `docs/screenshots/individual_run_N/`;
+5. arrêter l’environnement avec `docker compose down`;
+6. répéter les étapes précédentes pour le scénario batch avec `k6-batch`, en conservant `k6_batch_results_runN.json` et `docs/screenshots/batch_run_N/`.
+
+Les cinq répétitions de chaque scénario ont été conservées selon cette convention. Les artefacts nécessaires à l’audit sont répartis comme suit : `tests/` contient les générateurs de charge, `proto/` le contrat gRPC, `results/` les résumés JSON, `docs/screenshots/` les captures par run, `grafana/` les dashboards, `docs/figures/` les sources de diagrammes et `docs/adr/` les décisions architecturales.
+
+La reproductibilité doit être comprise à deux niveaux. Le protocole, les scripts, les limites de ressources et les métriques peuvent être reproduits directement. Les valeurs exactes de latence peuvent varier selon l’hôte, la version de Docker, Windows/WSL2 et la virtualisation; la propriété attendue est donc la reproduction des tendances et du raisonnement, pas l’égalité au milliseconde près.
+
+### 8.8. Règle d’interprétation
 
 La section 9 rapporte les observations consolidées sans leur attribuer automatiquement une cause. La section 10 analysera les mécanismes possibles; la section 11 discutera les compromis opérationnels et contractuels. Cette séparation distingue une mesure, une explication et une recommandation architecturale.
 
@@ -520,7 +538,7 @@ Le point de bascule doit donc être défini comme une décision économique et o
 
 Une équipe devrait commencer par caractériser le scénario réel : taille et fréquence des messages, criticité de la latence, nombre de consommateurs, fréquence des changements de contrat et capacité des équipes à exploiter des outils spécialisés. Elle devrait ensuite reproduire une mesure représentative, car les résultats de ce projet ne remplacent pas une mesure dans le contexte cible.
 
-L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml). Il formalise les règles suivantes :
+L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml). Le bloc Mermaid qui suit en est un rendu portable pour le rapport; il ne constitue pas un diagramme supplémentaire. Il formalise les règles suivantes :
 
 1. pour un payload petit et une forte priorité donnée à la lisibilité, commencer par REST;
 2. pour un appel de procédure textuel et inspectable, considérer JSON-RPC;
