@@ -46,7 +46,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
-      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p50)", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "k6_batch_protocol_request_duration_p50{testid=~\"$testid\"}", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
       "id": 6,
@@ -55,7 +55,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
-      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p95)", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "k6_batch_protocol_request_duration_p95{testid=~\"$testid\"}", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
       "id": 7,
@@ -64,7 +64,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
-      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p99)", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "k6_batch_protocol_request_duration_p99{testid=~\"$testid\"}", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
       "id": 8,
@@ -73,7 +73,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "reqps", "min": 0 }, "overrides": [] },
-      "targets": [{ "expr": "sum by (protocol) (rate(k6_batch_protocol_requests_total[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "sum by (protocol) (rate(k6_batch_protocol_requests_total{testid=~\"$testid\"}[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
       "id": 9,
@@ -82,7 +82,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
-      "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_error_rate_rate)", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "k6_batch_protocol_error_rate_rate{testid=~\"$testid\"}", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
       "id": 10,
@@ -91,12 +91,32 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "none", "min": 0 }, "overrides": [] },
-      "targets": [{ "expr": "500 * sum by (protocol) (rate(k6_batch_protocol_requests_total[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
+      "targets": [{ "expr": "500 * sum by (protocol) (rate(k6_batch_protocol_requests_total{testid=~\"$testid\"}[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
     }
   ],
   "refresh": "5s",
   "schemaVersion": 39,
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "testid",
+        "label": "Run",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": {
+          "query": "label_values(k6_batch_protocol_requests_total, testid)",
+          "refId": "StandardVariableQuery"
+        },
+        "definition": "label_values(k6_batch_protocol_requests_total, testid)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "refresh": 1,
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "options": []
+      }
+    ]
+  },
   "time": { "from": "now-15m", "to": "now" },
   "title": "IPC Batch Benchmark",
   "uid": "ipc-batch-benchmark",

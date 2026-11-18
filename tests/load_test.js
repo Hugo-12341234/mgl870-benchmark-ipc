@@ -3,6 +3,10 @@ import http from "k6/http";
 import { check } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 
+const protocols = ["rest", "graphql", "jsonrpc", "grpc"];
+const quickTest = __ENV.QUICK_TEST === "true";
+const testId = __ENV.TEST_ID || "manual-individual";
+
 const tick = {
   symbol: "SHOP",
   price: 115.42,
@@ -25,11 +29,17 @@ const requests = new Counter("protocol_requests");
 const errors = new Counter("protocol_errors");
 const errorRate = new Rate("protocol_error_rate");
 
-const rateStages = [
-  { target: 2000, duration: "3m" },
-  { target: 4000, duration: "3m" },
-  { target: 6000, duration: "4m" },
-];
+const rateStages = quickTest
+  ? [
+      { target: 20, duration: "10s" },
+      { target: 50, duration: "10s" },
+      { target: 100, duration: "10s" },
+    ]
+  : [
+      { target: 2000, duration: "3m" },
+      { target: 4000, duration: "3m" },
+      { target: 6000, duration: "4m" },
+    ];
 
 function scenario(protocol, exec) {
   return {
@@ -37,30 +47,57 @@ function scenario(protocol, exec) {
     startRate: 0,
     timeUnit: "1s",
     stages: rateStages,
-    preAllocatedVUs: 4000,
-    maxVUs: 4000,
+    preAllocatedVUs: quickTest ? 100 : 4000,
+    maxVUs: quickTest ? 200 : 4000,
     exec,
     tags: { protocol },
   };
 }
 
+function thresholds() {
+  const result = {
+    protocol_request_duration: ["p(95)<1000", "p(99)<2000"],
+    protocol_error_rate: ["rate<0.01"],
+  };
+
+  // Tagged thresholds force k6 to retain per-protocol submetrics in the JSON
+  // summary. Their broad limits are not SLOs; the global thresholds above are
+  // the explicit saturation objectives.
+  for (const protocol of protocols) {
+    result[`protocol_request_duration{protocol:${protocol}}`] = [
+      "p(99)<120000",
+    ];
+    result[`protocol_requests{protocol:${protocol}}`] = ["count>0"];
+    result[`protocol_error_rate{protocol:${protocol}}`] = ["rate<1"];
+  }
+  return result;
+}
+
 export const options = {
+  tags: { testid: testId, workload: "individual" },
+  summaryTrendStats: [
+    "avg",
+    "min",
+    "med",
+    "max",
+    "p(50)",
+    "p(90)",
+    "p(95)",
+    "p(99)",
+    "count",
+  ],
   scenarios: {
     rest: scenario("rest", "rest"),
     graphql: scenario("graphql", "graphql"),
     jsonrpc: scenario("jsonrpc", "jsonrpc"),
     grpc: scenario("grpc", "grpc"),
   },
-  thresholds: {
-    protocol_request_duration: ["p(95)<1000", "p(99)<2000"],
-    protocol_error_rate: ["rate<0.01"],
-  },
+  thresholds: thresholds(),
 };
 
-function record(protocol, start, success) {
+function record(protocol, duration, success) {
   const tags = { protocol };
-  const duration = Date.now() - start;
-  requestDuration.add(duration, tags);
+  requestDuration.add(Math.max(0, duration), tags);
   requests.add(1, tags);
   errorRate.add(!success, tags);
   if (!success) {
@@ -68,23 +105,32 @@ function record(protocol, start, success) {
   }
 }
 
-function post(url, body, protocol) {
+function timedPost(url, body, protocol) {
   const start = Date.now();
   const response = http.post(url, JSON.stringify(body), {
     headers: jsonHeaders,
     tags: { protocol },
   });
-  record(protocol, start, response.status === 200);
-  return response;
+  return { response, duration: Date.now() - start };
+}
+
+function responseJson(response) {
+  try {
+    return response.json();
+  } catch (_) {
+    return null;
+  }
 }
 
 export function rest() {
-  const response = post(restUrl, tick, "rest");
-  check(response, { "REST status is 200": (result) => result.status === 200 });
+  const { response, duration } = timedPost(restUrl, tick, "rest");
+  const success = response.status === 200;
+  record("rest", duration, success);
+  check(success, { "REST response is valid": (result) => result === true });
 }
 
 export function graphql() {
-  const response = post(
+  const { response, duration } = timedPost(
     graphqlUrl,
     {
       query:
@@ -93,24 +139,38 @@ export function graphql() {
     },
     "graphql",
   );
-  check(response, {
-    "GraphQL status is 200": (result) => result.status === 200,
+  const payload = responseJson(response);
+  const success =
+    response.status === 200 &&
+    !payload?.errors &&
+    payload?.data?.ingestTick === true;
+  record("graphql", duration, success);
+  check(success, {
+    "GraphQL response is valid": (result) => result === true,
   });
 }
 
 export function jsonrpc() {
-  const response = post(
+  const id = __VU * 1000000 + __ITER;
+  const { response, duration } = timedPost(
     jsonrpcUrl,
     {
       jsonrpc: "2.0",
       method: "ingest_tick",
       params: tick,
-      id: __VU * 1000000 + __ITER,
+      id,
     },
     "jsonrpc",
   );
-  check(response, {
-    "JSON-RPC status is 200": (result) => result.status === 200,
+  const payload = responseJson(response);
+  const success =
+    response.status === 200 &&
+    payload?.jsonrpc === "2.0" &&
+    payload?.result === true &&
+    payload?.id === id;
+  record("jsonrpc", duration, success);
+  check(success, {
+    "JSON-RPC response is valid": (result) => result === true,
   });
 }
 
@@ -130,12 +190,19 @@ export function grpc() {
     success = false;
   }
 
-  record(protocol, start, success);
-  check(success, { "gRPC status is OK": (result) => result === true });
+  record(protocol, Date.now() - start, success);
+  check(success, { "gRPC response is valid": (result) => result === true });
 }
 
 export default function () {}
 
 export function handleSummary(data) {
-  return { "k6_results.json": JSON.stringify(data, null, 2) };
+  const requestedPath = __ENV.RESULT_PATH || "k6_results.json";
+  const safePath = requestedPath
+    .replaceAll("\\", "/")
+    .replaceAll("..", "_")
+    .replace(/^\/+/, "");
+  return {
+    [`/results/${safePath}`]: JSON.stringify(data, null, 2),
+  };
 }

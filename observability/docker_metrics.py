@@ -38,7 +38,8 @@ def docker_get(path):
 
 def labels(container):
     service = container.get("Labels", {}).get("com.docker.compose.service", "")
-    return service if service.startswith("server-") else None
+    observed_services = {"k6-single", "k6-batch"}
+    return service if service.startswith("server-") or service in observed_services else None
 
 
 def metric(name, help_text, metric_type, samples):
