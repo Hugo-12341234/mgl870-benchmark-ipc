@@ -1,0 +1,106 @@
+{
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 8006.352672
+  },
+  "metrics": {
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 0,
+        "rate": 0
+      }
+    },
+    "iteration_duration": {
+      "contains": "time",
+      "values": {
+        "avg": 1000.736830125,
+        "min": 1000.374771,
+        "med": 1000.6882949999999,
+        "max": 1001.187933,
+        "p(90)": 1000.9915676,
+        "p(95)": 1001.0897503
+      },
+      "type": "trend"
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 8,
+        "rate": 0.9992065460690712
+      }
+    },
+    "latency_unit_validation_duration": {
+      "contains": "time",
+      "values": {
+        "med": 1000,
+        "max": 1000,
+        "p(90)": 1000,
+        "p(95)": 1000,
+        "avg": 1000,
+        "min": 1000
+      },
+      "type": "trend"
+    },
+    "latency_unit_validation_plain": {
+      "values": {
+        "avg": 1000,
+        "min": 1000,
+        "med": 1000,
+        "max": 1000,
+        "p(90)": 1000,
+        "p(95)": 1000
+      },
+      "type": "trend",
+      "contains": "default"
+    },
+    "vus": {
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 1,
+        "max": 1
+      },
+      "type": "gauge"
+    },
+    "vus_max": {
+      "contains": "default",
+      "values": {
+        "value": 1,
+        "min": 1,
+        "max": 1
+      },
+      "type": "gauge"
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 0,
+        "rate": 0
+      }
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": []
+  }
+}

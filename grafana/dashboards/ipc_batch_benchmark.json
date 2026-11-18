@@ -45,7 +45,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
       "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p50)", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
@@ -54,7 +54,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
       "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p95)", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
@@ -63,7 +63,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "ms", "min": 0 }, "overrides": [] },
+      "fieldConfig": { "defaults": { "unit": "s", "min": 0 }, "overrides": [] },
       "targets": [{ "expr": "avg by (protocol) (k6_batch_protocol_request_duration_p99)", "legendFormat": "{{protocol}}", "refId": "A" }]
     },
     {
