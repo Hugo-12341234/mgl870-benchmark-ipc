@@ -16,7 +16,10 @@ if (-not $OutputDirectory) {
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $targetDirectory = Join-Path $repositoryRoot (Join-Path "results" $OutputDirectory)
 if (Test-Path -LiteralPath $targetDirectory) {
-    $existingSummaries = @(Get-ChildItem -LiteralPath $targetDirectory -Filter "k6*_results_run*.json" -ErrorAction SilentlyContinue)
+    $existingSummaries = @(
+        Get-ChildItem -LiteralPath $targetDirectory -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq "k6_summary.json" -or $_.Name -like "k6*_results_run*.json" }
+    )
     if ($existingSummaries.Count -gt 0) {
         throw "The result directory already contains benchmark summaries: $targetDirectory. Use a new SuiteId or OutputDirectory."
     }
@@ -46,6 +49,10 @@ for ($run = 1; $run -le $runs; $run++) {
 }
 
 & (Join-Path $PSScriptRoot "summarize_results.ps1") -OutputDirectory $OutputDirectory
+
+$screenshotsDirectory = Join-Path $targetDirectory "screenshots"
+New-Item -ItemType Directory -Force -Path (Join-Path $screenshotsDirectory "individual") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $screenshotsDirectory "batch") | Out-Null
 
 Write-Host ""
 Write-Host "Benchmark suite complete."

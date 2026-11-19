@@ -27,25 +27,14 @@ if ($OutputDirectory -match "\.\." -or [System.IO.Path]::IsPathRooted($OutputDir
 
 $safeSuiteId = $SuiteId -replace "[^A-Za-z0-9_-]", "-"
 $testId = "${safeSuiteId}-${Workload}-run${Run}"
-$resultDirectory = Join-Path $repositoryRoot (Join-Path "results" $OutputDirectory)
+$suiteDirectory = Join-Path $repositoryRoot (Join-Path "results" $OutputDirectory)
+$resultDirectory = Join-Path $suiteDirectory (Join-Path $Workload "run_$Run")
 New-Item -ItemType Directory -Force -Path $resultDirectory | Out-Null
 
-$resultName = if ($Workload -eq "batch") {
-    "k6_batch_results_run${Run}.json"
-} else {
-    "k6_results_run${Run}.json"
-}
-$telemetryName = if ($Workload -eq "batch") {
-    "prometheus_batch_run${Run}.json"
-} else {
-    "prometheus_individual_run${Run}.json"
-}
-$manifestName = if ($Workload -eq "batch") {
-    "manifest_batch_run${Run}.json"
-} else {
-    "manifest_individual_run${Run}.json"
-}
-$relativeResultPath = ($OutputDirectory.TrimEnd("/", "\") + "/" + $resultName).Replace("\", "/")
+$resultName = "k6_summary.json"
+$telemetryName = "prometheus.json"
+$manifestName = "manifest.json"
+$relativeResultPath = ($OutputDirectory.TrimEnd("/", "\") + "/$Workload/run_$Run/$resultName").Replace("\", "/")
 
 function Assert-LastExitCode {
     param([string]$Operation)

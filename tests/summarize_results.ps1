@@ -9,18 +9,25 @@ if ($OutputDirectory -match "\.\." -or [System.IO.Path]::IsPathRooted($OutputDir
     throw "OutputDirectory must be a relative directory below results/."
 }
 $resultDirectory = Join-Path $repositoryRoot (Join-Path "results" $OutputDirectory)
+$summaryDirectory = Join-Path $resultDirectory "summary"
+New-Item -ItemType Directory -Force -Path $summaryDirectory | Out-Null
 $protocols = @("rest", "graphql", "jsonrpc", "grpc")
 $rows = @()
 
-$files = Get-ChildItem -LiteralPath $resultDirectory -Filter "k6*_results_run*.json" | Sort-Object Name
+$files = Get-ChildItem -LiteralPath $resultDirectory -Recurse -File -Filter "k6_summary.json" | Sort-Object FullName
 foreach ($file in $files) {
-    $isBatch = $file.Name -like "k6_batch_*"
-    $workload = if ($isBatch) { "batch" } else { "individual" }
-    $metricPrefix = if ($isBatch) { "batch_protocol" } else { "protocol" }
-    if ($file.Name -notmatch "run(\d+)") {
-        continue
+    $manifestPath = Join-Path $file.Directory.FullName "manifest.json"
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        throw "Missing manifest next to $($file.FullName)."
     }
-    $run = [int]$Matches[1]
+    $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+    $workload = [string]$manifest.workload
+    $run = [int]$manifest.run
+    $isBatch = $workload -eq "batch"
+    $metricPrefix = if ($isBatch) { "batch_protocol" } else { "protocol" }
+    if ($workload -notin @("individual", "batch") -or $run -lt 1) {
+        throw "Invalid workload or run number in $manifestPath."
+    }
     $summary = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
     $dropped = [long]$summary.metrics.dropped_iterations.values.count
     $iterations = [long]$summary.metrics.iterations.values.count
@@ -55,7 +62,7 @@ if ($rows.Count -eq 0) {
     throw "No rerun summaries were found in $resultDirectory."
 }
 
-$rows | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $resultDirectory "per_run_results.csv")
+$rows | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "per_run_results.csv")
 
 $consolidated = $rows | Group-Object workload, protocol | ForEach-Object {
     $groupRows = $_.Group
@@ -73,7 +80,7 @@ $consolidated = $rows | Group-Object workload, protocol | ForEach-Object {
         mean_error_rate = ($groupRows | Measure-Object error_rate -Average).Average
     }
 }
-$consolidated | Sort-Object workload, protocol | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $resultDirectory "consolidated_results.csv")
+$consolidated | Sort-Object workload, protocol | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "consolidated_results.csv")
 
 $markdown = @(
     "# Consolidated benchmark results",
@@ -84,7 +91,7 @@ $markdown = @(
 foreach ($row in ($consolidated | Sort-Object workload, protocol)) {
     $markdown += "| $($row.workload) | $($row.protocol) | $($row.runs) | $([math]::Round($row.mean_requests_per_second, 1)) | $([math]::Round($row.mean_ticks_per_second, 1)) | $([math]::Round($row.mean_p50_ms, 2)) | $([math]::Round($row.mean_p95_ms, 2)) | $([math]::Round($row.mean_p99_ms, 2)) | $([math]::Round($row.min_p99_ms, 2))-$([math]::Round($row.max_p99_ms, 2)) | $([math]::Round($row.mean_error_rate, 6)) |"
 }
-$markdown | Set-Content -Encoding utf8 -LiteralPath (Join-Path $resultDirectory "consolidated_results.md")
+$markdown | Set-Content -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "consolidated_results.md")
 
 $representatives = @()
 foreach ($workloadGroup in ($rows | Group-Object workload)) {
@@ -102,12 +109,7 @@ foreach ($workloadGroup in ($rows | Group-Object workload)) {
         ([double]$sortedScores[$middle - 1] + [double]$sortedScores[$middle]) / 2
     }
     $selected = $runScores | Sort-Object @{ Expression = { [math]::Abs($_.mean_p99_ms - $medianMeanP99) } }, run | Select-Object -First 1
-    $manifestPattern = if ($workloadGroup.Name -eq "batch") {
-        "manifest_batch_run$($selected.run).json"
-    } else {
-        "manifest_individual_run$($selected.run).json"
-    }
-    $manifestPath = Join-Path $resultDirectory $manifestPattern
+    $manifestPath = Join-Path $resultDirectory (Join-Path $workloadGroup.Name (Join-Path "run_$($selected.run)" "manifest.json"))
     $testId = if (Test-Path -LiteralPath $manifestPath) {
         (Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json).test_id
     } else {
@@ -133,9 +135,9 @@ $representativeMarkdown = @(
 foreach ($representative in ($representatives | Sort-Object workload)) {
     $representativeMarkdown += "| $($representative.workload) | $($representative.run) | ``$($representative.test_id)`` | $([math]::Round($representative.mean_p99_ms, 3)) | $([math]::Round($representative.median_of_run_mean_p99_ms, 3)) |"
 }
-$representativeMarkdown | Set-Content -Encoding utf8 -LiteralPath (Join-Path $resultDirectory "representative_runs.md")
+$representativeMarkdown | Set-Content -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "representative_runs.md")
 
-Write-Host "Consolidated results written to $resultDirectory"
+Write-Host "Consolidated results written to $summaryDirectory"
 $consolidated | Sort-Object workload, protocol | Format-Table -AutoSize
 Write-Host ""
 Write-Host "Representative runs for Grafana captures:"

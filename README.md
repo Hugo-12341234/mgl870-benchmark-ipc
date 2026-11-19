@@ -22,9 +22,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1
 ```
 
 La commande officielle produit un nouveau répertoire horodaté sous `results/`.
-Elle conserve les résumés k6 par run, les séries Prometheus exportées, un
-manifeste d’environnement et les tableaux consolidés CSV/Markdown. Grafana et
-Prometheus restent actifs à la fin :
+Chaque scénario et chaque run possède son propre sous-répertoire. Le dossier
+`summary/` contient les tableaux consolidés et `screenshots/` reçoit les
+captures représentatives. Grafana et Prometheus restent actifs à la fin :
 
 - Grafana : <http://localhost:3000>
 - Prometheus : <http://localhost:9090>

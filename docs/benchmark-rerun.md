@@ -25,8 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1
 ```
 
 Le pilote doit terminer avec zéro échec de check et créer un dossier
-`results/pilot_<horodatage>/` contenant deux JSON k6, deux exports Prometheus,
-deux manifestes et les fichiers consolidés.
+`results/pilot_<horodatage>/` organisé par scénario et par run.
 
 ## Campagne officielle
 
@@ -44,23 +43,48 @@ Un code k6 `99` peut être attendu lorsqu’un seuil de saturation volontaire es
 franchi. Le script l’accepte, mais refuse le run si un check sémantique échoue,
 si un artefact manque ou si les métriques séparées d’un protocole sont absentes.
 
+## Organisation des artefacts
+
+```text
+results/rerun_<horodatage>/
+├── individual/
+│   ├── run_1/
+│   │   ├── k6_summary.json
+│   │   ├── prometheus.json
+│   │   └── manifest.json
+│   └── run_2/ ... run_5/
+├── batch/
+│   ├── run_1/
+│   │   ├── k6_summary.json
+│   │   ├── prometheus.json
+│   │   └── manifest.json
+│   └── run_2/ ... run_5/
+├── summary/
+│   ├── per_run_results.csv
+│   ├── consolidated_results.csv
+│   ├── consolidated_results.md
+│   └── representative_runs.md
+└── screenshots/
+    ├── individual/
+    └── batch/
+```
+
 ## Artefacts produits
 
 Pour chaque run :
 
-- `k6_results_runN.json` ou `k6_batch_results_runN.json` : compteurs et
-  percentiles par protocole en millisecondes;
-- `prometheus_*_runN.json` : séries temporelles brutes, avec les latences en
+- `k6_summary.json` : compteurs et percentiles par protocole en millisecondes;
+- `prometheus.json` : séries temporelles brutes, avec les latences en
   secondes comme elles sont stockées par le remote write k6;
-- `manifest_*_runN.json` : identifiant du test, période UTC, commit Git, état du
+- `manifest.json` : identifiant du test, période UTC, commit Git, état du
   dépôt, version Docker et caractéristiques de l’hôte.
 
 Pour l’ensemble de la campagne :
 
-- `per_run_results.csv` : une ligne par scénario, répétition et protocole;
-- `consolidated_results.csv` et `consolidated_results.md` : moyennes des cinq
+- `summary/per_run_results.csv` : une ligne par scénario, répétition et protocole;
+- `summary/consolidated_results.csv` et `summary/consolidated_results.md` : moyennes des cinq
   répétitions et étendue du p99;
-- `representative_runs.md` : run et `testid` à sélectionner pour les captures
+- `summary/representative_runs.md` : run et `testid` à sélectionner pour les captures
   Grafana selon une règle déterministe.
 
 Ces fichiers sont les preuves numériques principales. Les captures Grafana
@@ -72,7 +96,7 @@ Il n’est pas nécessaire d’insérer ou de refaire une capture pour chacun de
 runs. Une stratégie plus claire et plus défendable est :
 
 1. conserver les données k6, Prometheus et les manifestes des dix runs;
-2. utiliser les runs indiqués dans `representative_runs.md`; le script choisit,
+2. utiliser les runs indiqués dans `summary/representative_runs.md`; le script choisit,
    pour chaque scénario, le run dont la moyenne des p99 des quatre protocoles
    est la plus proche de la médiane des cinq moyennes de run;
 3. sélectionner leur `testid` dans la variable du dashboard Grafana;
@@ -88,7 +112,7 @@ valeurs sans appliquer ce facteur de conversion.
 
 ## Après la campagne
 
-1. Vérifier que `consolidated_results.md` contient huit lignes : quatre
+1. Vérifier que `summary/consolidated_results.md` contient huit lignes : quatre
    protocoles pour chacun des deux scénarios, avec cinq runs par ligne.
 2. Vérifier que chaque manifeste indique zéro échec sémantique.
 3. Vérifier que chaque manifeste contient un compte de séries supérieur à zéro
