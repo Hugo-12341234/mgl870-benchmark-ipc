@@ -92,6 +92,15 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "none", "min": 0 }, "overrides": [] },
       "targets": [{ "expr": "500 * sum by (protocol) (rate(k6_batch_protocol_requests_total{testid=~\"$testid\"}[1m]))", "legendFormat": "{{protocol}}", "refId": "A" }]
+    },
+    {
+      "id": 11,
+      "title": "Batch Dropped Iterations per Second",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "none", "min": 0 }, "overrides": [] },
+      "targets": [{ "expr": "sum by (scenario) (rate(k6_dropped_iterations_total{testid=~\"$testid\"}[1m]))", "legendFormat": "{{scenario}}", "refId": "A" }]
     }
   ],
   "refresh": "5s",
