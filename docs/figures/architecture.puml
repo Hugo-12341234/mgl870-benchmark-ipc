@@ -1,4 +1,4 @@
-@startuml "MGL870 - Vue Déploiement"
+@startuml
 !theme plain
 skinparam backgroundColor #FFFFFF
 skinparam linetype ortho
@@ -76,8 +76,8 @@ JsonRpcC -[hidden]right-> GrpcC
 legend right
 Générateur de charge : deux scénarios k6,
 micro-message unitaire et lot de 500 ticks.
-Services évalués : quatre conteneurs construits
-depuis le même projet Rust et limités à 0,25 vCPU.
+Services évalués : quatre répliques de la même image
+Rust, isolées et limitées chacune à 0,25 vCPU.
 REST, GraphQL et JSON-RPC utilisent HTTP/1.1 + JSON.
 gRPC utilise HTTP/2 + Protocol Buffers.
 Observabilité : Prometheus collecte les métriques,

@@ -1,7 +1,7 @@
-mod models;
 mod graphql;
 mod grpc;
 mod jsonrpc;
+mod models;
 mod rest;
 
 #[tokio::main]
@@ -19,7 +19,5 @@ async fn main() {
         .await
         .expect("failed to bind server listener");
 
-    axum::serve(listener, app)
-        .await
-        .expect("server failed");
+    axum::serve(listener, app).await.expect("server failed");
 }

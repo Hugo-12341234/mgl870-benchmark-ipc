@@ -28,4 +28,4 @@ La configuration est représentative d’un environnement fortement contraint, m
 
 ## Preuves attendues
 
-Les fichiers `docker-compose.yml` et les captures Grafana doivent montrer le plafonnement proche de 25 % de la capacité exposée à chaque conteneur.
+Les fichiers `docker-compose.yml` et les captures Grafana doivent montrer la limite commune, son atteinte par les services saturés et la marge éventuelle d’un service qui maintient la cible.

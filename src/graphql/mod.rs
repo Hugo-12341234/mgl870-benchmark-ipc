@@ -1,6 +1,6 @@
 use async_graphql::{EmptySubscription, InputObject, Object, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{extract::State, routing::post, Router};
+use axum::{Router, extract::State, routing::post};
 
 #[derive(InputObject)]
 struct TickInput {

@@ -1,7 +1,7 @@
-use axum::{extract::Json, http::StatusCode, routing::post, Router};
+use axum::{Router, extract::Json, http::StatusCode, routing::post};
 use jsonrpsee::proc_macros::rpc;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::models::Tick;
 
@@ -84,9 +84,7 @@ async fn jsonrpc_handler(Json(request): Json<JsonRpcRequest>) -> (StatusCode, Js
     (StatusCode::OK, Json(json!(response)))
 }
 
-async fn handle_batch_request(
-    request: JsonRpcRequest,
-) -> (StatusCode, Json<Value>) {
+async fn handle_batch_request(request: JsonRpcRequest) -> (StatusCode, Json<Value>) {
     let Some(params) = request.params else {
         return (
             StatusCode::BAD_REQUEST,

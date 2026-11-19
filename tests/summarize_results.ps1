@@ -14,6 +14,15 @@ New-Item -ItemType Directory -Force -Path $summaryDirectory | Out-Null
 $protocols = @("rest", "graphql", "jsonrpc", "grpc")
 $rows = @()
 
+function Get-PopulationCvPercent {
+    param([double[]]$Values)
+    if ($Values.Count -eq 0) { return 0 }
+    $mean = ($Values | Measure-Object -Average).Average
+    if ($mean -eq 0) { return 0 }
+    $sumSquares = ($Values | ForEach-Object { ($_ - $mean) * ($_ - $mean) } | Measure-Object -Sum).Sum
+    return 100 * [math]::Sqrt($sumSquares / $Values.Count) / $mean
+}
+
 $files = Get-ChildItem -LiteralPath $resultDirectory -Recurse -File -Filter "k6_summary.json" | Sort-Object FullName
 foreach ($file in $files) {
     $manifestPath = Join-Path $file.Directory.FullName "manifest.json"
@@ -29,6 +38,18 @@ foreach ($file in $files) {
         throw "Invalid workload or run number in $manifestPath."
     }
     $summary = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
+    $telemetryPath = Join-Path $file.Directory.FullName "prometheus.json"
+    if (-not (Test-Path -LiteralPath $telemetryPath)) {
+        throw "Missing Prometheus export next to $($file.FullName)."
+    }
+    $telemetry = Get-Content -Raw -LiteralPath $telemetryPath | ConvertFrom-Json
+    $peakRates = @{}
+    foreach ($series in @($telemetry.queries.requests_per_second.data.result)) {
+        $values = @($series.values | ForEach-Object { [double]$_[1] })
+        if ($values.Count -gt 0) {
+            $peakRates[[string]$series.metric.protocol] = ($values | Measure-Object -Maximum).Maximum
+        }
+    }
     $dropped = [long]$summary.metrics.dropped_iterations.values.count
     $iterations = [long]$summary.metrics.iterations.values.count
 
@@ -39,6 +60,9 @@ foreach ($file in $files) {
         $duration = $summary.metrics.PSObject.Properties[$durationKey].Value.values
         $requests = $summary.metrics.PSObject.Properties[$requestsKey].Value.values
         $errorRate = $summary.metrics.PSObject.Properties[$errorsKey].Value.values.rate
+        if (-not $peakRates.ContainsKey($protocol)) {
+            throw "Missing peak request-rate series for $protocol in $telemetryPath."
+        }
         $rows += [pscustomobject]@{
             workload = $workload
             run = $run
@@ -46,6 +70,8 @@ foreach ($file in $files) {
             requests = [long]$requests.count
             requests_per_second = [double]$requests.rate
             ticks_per_second = if ($isBatch) { 500 * [double]$requests.rate } else { [double]$requests.rate }
+            peak_requests_per_second = [double]$peakRates[$protocol]
+            peak_ticks_per_second = if ($isBatch) { 500 * [double]$peakRates[$protocol] } else { [double]$peakRates[$protocol] }
             avg_ms = [double]$duration.avg
             p50_ms = [double]$duration.'p(50)'
             p95_ms = [double]$duration.'p(95)'
@@ -66,18 +92,25 @@ $rows | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $su
 
 $consolidated = $rows | Group-Object workload, protocol | ForEach-Object {
     $groupRows = $_.Group
+    $requestRates = [double[]]@($groupRows | ForEach-Object { [double]$_.requests_per_second })
+    $p99Values = [double[]]@($groupRows | ForEach-Object { [double]$_.p99_ms })
     [pscustomobject]@{
         workload = $groupRows[0].workload
         protocol = $groupRows[0].protocol
         runs = $groupRows.Count
         mean_requests_per_second = ($groupRows | Measure-Object requests_per_second -Average).Average
         mean_ticks_per_second = ($groupRows | Measure-Object ticks_per_second -Average).Average
+        mean_peak_requests_per_second = ($groupRows | Measure-Object peak_requests_per_second -Average).Average
+        mean_peak_ticks_per_second = ($groupRows | Measure-Object peak_ticks_per_second -Average).Average
+        requests_per_second_cv_percent = Get-PopulationCvPercent -Values $requestRates
         mean_p50_ms = ($groupRows | Measure-Object p50_ms -Average).Average
         mean_p95_ms = ($groupRows | Measure-Object p95_ms -Average).Average
         mean_p99_ms = ($groupRows | Measure-Object p99_ms -Average).Average
         min_p99_ms = ($groupRows | Measure-Object p99_ms -Minimum).Minimum
         max_p99_ms = ($groupRows | Measure-Object p99_ms -Maximum).Maximum
+        p99_cv_percent = Get-PopulationCvPercent -Values $p99Values
         mean_error_rate = ($groupRows | Measure-Object error_rate -Average).Average
+        mean_dropped_percent = ($groupRows | Measure-Object dropped_percent -Average).Average
     }
 }
 $consolidated | Sort-Object workload, protocol | Export-Csv -NoTypeInformation -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "consolidated_results.csv")
@@ -85,11 +118,11 @@ $consolidated | Sort-Object workload, protocol | Export-Csv -NoTypeInformation -
 $markdown = @(
     "# Consolidated benchmark results",
     "",
-    "| Workload | Protocol | Runs | Mean req/s | Mean ticks/s | Mean p50 (ms) | Mean p95 (ms) | Mean p99 (ms) | Min-max p99 (ms) | Error rate |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
+    "| Workload | Protocol | Runs | Mean req/s | Mean peak req/s | Mean ticks/s | Mean peak ticks/s | Req/s CV | Mean p50 (ms) | Mean p95 (ms) | Mean p99 (ms) | Min-max p99 (ms) | p99 CV | Error rate |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"
 )
 foreach ($row in ($consolidated | Sort-Object workload, protocol)) {
-    $markdown += "| $($row.workload) | $($row.protocol) | $($row.runs) | $([math]::Round($row.mean_requests_per_second, 1)) | $([math]::Round($row.mean_ticks_per_second, 1)) | $([math]::Round($row.mean_p50_ms, 2)) | $([math]::Round($row.mean_p95_ms, 2)) | $([math]::Round($row.mean_p99_ms, 2)) | $([math]::Round($row.min_p99_ms, 2))-$([math]::Round($row.max_p99_ms, 2)) | $([math]::Round($row.mean_error_rate, 6)) |"
+    $markdown += "| $($row.workload) | $($row.protocol) | $($row.runs) | $([math]::Round($row.mean_requests_per_second, 1)) | $([math]::Round($row.mean_peak_requests_per_second, 1)) | $([math]::Round($row.mean_ticks_per_second, 1)) | $([math]::Round($row.mean_peak_ticks_per_second, 1)) | $([math]::Round($row.requests_per_second_cv_percent, 1))% | $([math]::Round($row.mean_p50_ms, 2)) | $([math]::Round($row.mean_p95_ms, 2)) | $([math]::Round($row.mean_p99_ms, 2)) | $([math]::Round($row.min_p99_ms, 2))-$([math]::Round($row.max_p99_ms, 2)) | $([math]::Round($row.p99_cv_percent, 1))% | $([math]::Round($row.mean_error_rate, 6)) |"
 }
 $markdown | Set-Content -Encoding utf8 -LiteralPath (Join-Path $summaryDirectory "consolidated_results.md")
 

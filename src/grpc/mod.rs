@@ -10,10 +10,7 @@ struct TickIngestionService;
 
 #[tonic::async_trait]
 impl TickIngestion for TickIngestionService {
-    async fn ingest_tick(
-        &self,
-        _request: Request<TickMessage>,
-    ) -> Result<Response<Ack>, Status> {
+    async fn ingest_tick(&self, _request: Request<TickMessage>) -> Result<Response<Ack>, Status> {
         Ok(Response::new(Ack {}))
     }
 

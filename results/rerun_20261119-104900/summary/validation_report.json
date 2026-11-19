@@ -1,0 +1,508 @@
+﻿{
+    "schema_version":  1,
+    "suite":  "rerun_20261119-104900",
+    "generated_utc":  "2026-11-19T18:33:41.8754365+00:00",
+    "expected_runs_per_workload":  5,
+    "status":  "PASS",
+    "checks_total":  75,
+    "checks_failed":  0,
+    "checks":  [
+                   {
+                       "name":  "individual run 1 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\individual\\run_1"
+                   },
+                   {
+                       "name":  "individual run 1 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "individual run 1 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "individual run 1 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-individual-run1"
+                   },
+                   {
+                       "name":  "individual run 1 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "individual run 1 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "individual run 1 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "individual run 2 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\individual\\run_2"
+                   },
+                   {
+                       "name":  "individual run 2 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "individual run 2 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "individual run 2 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-individual-run2"
+                   },
+                   {
+                       "name":  "individual run 2 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "individual run 2 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "individual run 2 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "individual run 3 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\individual\\run_3"
+                   },
+                   {
+                       "name":  "individual run 3 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "individual run 3 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "individual run 3 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-individual-run3"
+                   },
+                   {
+                       "name":  "individual run 3 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "individual run 3 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "individual run 3 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "individual run 4 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\individual\\run_4"
+                   },
+                   {
+                       "name":  "individual run 4 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "individual run 4 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "individual run 4 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-individual-run4"
+                   },
+                   {
+                       "name":  "individual run 4 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "individual run 4 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "individual run 4 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "individual run 5 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\individual\\run_5"
+                   },
+                   {
+                       "name":  "individual run 5 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "individual run 5 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "individual run 5 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-individual-run5"
+                   },
+                   {
+                       "name":  "individual run 5 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "individual run 5 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "individual run 5 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "batch run 1 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\batch\\run_1"
+                   },
+                   {
+                       "name":  "batch run 1 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "batch run 1 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "batch run 1 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-batch-run1"
+                   },
+                   {
+                       "name":  "batch run 1 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "batch run 1 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "batch run 1 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "batch run 2 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\batch\\run_2"
+                   },
+                   {
+                       "name":  "batch run 2 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "batch run 2 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "batch run 2 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-batch-run2"
+                   },
+                   {
+                       "name":  "batch run 2 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "batch run 2 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "batch run 2 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "batch run 3 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\batch\\run_3"
+                   },
+                   {
+                       "name":  "batch run 3 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "batch run 3 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "batch run 3 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-batch-run3"
+                   },
+                   {
+                       "name":  "batch run 3 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "batch run 3 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "batch run 3 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "batch run 4 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\batch\\run_4"
+                   },
+                   {
+                       "name":  "batch run 4 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "batch run 4 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "batch run 4 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-batch-run4"
+                   },
+                   {
+                       "name":  "batch run 4 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "batch run 4 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "batch run 4 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "batch run 5 artifacts",
+                       "passed":  true,
+                       "detail":  "C:\\Users\\hugov\\Documents\\GitHub\\mgl870-benchmark-ipc\\results\\rerun_20261119-104900\\batch\\run_5"
+                   },
+                   {
+                       "name":  "batch run 5 semantic checks",
+                       "passed":  true,
+                       "detail":  "failed=0"
+                   },
+                   {
+                       "name":  "batch run 5 official profile",
+                       "passed":  true,
+                       "detail":  "quick_test=False"
+                   },
+                   {
+                       "name":  "batch run 5 manifest identity",
+                       "passed":  true,
+                       "detail":  "test_id=20261119-104900-batch-run5"
+                   },
+                   {
+                       "name":  "batch run 5 per-protocol metrics",
+                       "passed":  true,
+                       "detail":  "four protocols expected"
+                   },
+                   {
+                       "name":  "batch run 5 error rates",
+                       "passed":  true,
+                       "detail":  "nonzero="
+                   },
+                   {
+                       "name":  "batch run 5 telemetry",
+                       "passed":  true,
+                       "detail":  "missing="
+                   },
+                   {
+                       "name":  "manifest count",
+                       "passed":  true,
+                       "detail":  "found=10, expected=10"
+                   },
+                   {
+                       "name":  "unique test IDs",
+                       "passed":  true,
+                       "detail":  "unique=10"
+                   },
+                   {
+                       "name":  "single Git commit",
+                       "passed":  true,
+                       "detail":  "b94ba5352de06c167473d725d4a64bc6d0368223"
+                   },
+                   {
+                       "name":  "single Docker version",
+                       "passed":  true,
+                       "detail":  "28.0.4"
+                   },
+                   {
+                       "name":  "single host configuration",
+                       "passed":  true,
+                       "detail":  "Microsoft Windows 11 Home|10.0.26200|Intel(R) Core(TM) i5-10400 CPU @ 2.90GHz|12|34005622784"
+                   }
+               ],
+    "runs":  [
+                 {
+                     "workload":  "individual",
+                     "run":  1,
+                     "test_id":  "20261119-104900-individual-run1",
+                     "duration_seconds":  601.508,
+                     "iterations":  6254316,
+                     "dropped_iterations":  1395806,
+                     "dropped_percent":  18.245539090749141,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "individual",
+                     "run":  2,
+                     "test_id":  "20261119-104900-individual-run2",
+                     "duration_seconds":  601.653,
+                     "iterations":  6464789,
+                     "dropped_iterations":  1213625,
+                     "dropped_percent":  15.805672890260931,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "individual",
+                     "run":  3,
+                     "test_id":  "20261119-104900-individual-run3",
+                     "duration_seconds":  601.62,
+                     "iterations":  6508437,
+                     "dropped_iterations":  1170688,
+                     "dropped_percent":  15.245070239122295,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "individual",
+                     "run":  4,
+                     "test_id":  "20261119-104900-individual-run4",
+                     "duration_seconds":  601.399,
+                     "iterations":  6433540,
+                     "dropped_iterations":  1236742,
+                     "dropped_percent":  16.123813961468432,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "individual",
+                     "run":  5,
+                     "test_id":  "20261119-104900-individual-run5",
+                     "duration_seconds":  601.719,
+                     "iterations":  6283475,
+                     "dropped_iterations":  1395069,
+                     "dropped_percent":  18.168405364350324,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "batch",
+                     "run":  1,
+                     "test_id":  "20261119-104900-batch-run1",
+                     "duration_seconds":  431.2,
+                     "iterations":  429599,
+                     "dropped_iterations":  206358,
+                     "dropped_percent":  32.448420254828548,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "batch",
+                     "run":  2,
+                     "test_id":  "20261119-104900-batch-run2",
+                     "duration_seconds":  431.929,
+                     "iterations":  438395,
+                     "dropped_iterations":  197558,
+                     "dropped_percent":  31.064874291024651,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "batch",
+                     "run":  3,
+                     "test_id":  "20261119-104900-batch-run3",
+                     "duration_seconds":  430.692,
+                     "iterations":  429941,
+                     "dropped_iterations":  206010,
+                     "dropped_percent":  32.394005198513725,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "batch",
+                     "run":  4,
+                     "test_id":  "20261119-104900-batch-run4",
+                     "duration_seconds":  429.846,
+                     "iterations":  433046,
+                     "dropped_iterations":  202854,
+                     "dropped_percent":  31.900298789117787,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 },
+                 {
+                     "workload":  "batch",
+                     "run":  5,
+                     "test_id":  "20261119-104900-batch-run5",
+                     "duration_seconds":  431.136,
+                     "iterations":  412011,
+                     "dropped_iterations":  223940,
+                     "dropped_percent":  35.213404806345146,
+                     "semantic_failures":  0,
+                     "application_error_protocols":  0,
+                     "telemetry_queries_missing":  0
+                 }
+             ]
+}

@@ -1,4 +1,4 @@
-@startuml "MGL870 - Workflow expérimental"
+@startuml
 !theme plain
 skinparam backgroundColor #FFFFFF
 skinparam shadowing false
@@ -16,6 +16,9 @@ start
 et les quatre serveurs;
 :Appliquer 0,25 vCPU
 et 512 MiB par serveur;
+:Attribuer un testid unique;
+:Redémarrer les quatre serveurs
+et vérifier leur disponibilité;
 
 if (Scénario ?) then (Unitaire)
   :Charger load_test.js;
@@ -32,16 +35,22 @@ JSON-RPC et gRPC en parallèle;
 :Collecter latence, débit,
 erreurs et itérations;
 :Collecter CPU, mémoire
-et réseau;
-:Exporter le JSON du run;
-:Capturer Grafana;
-:Redémarrer l’environnement;
+et réseau des serveurs et de k6;
+:Exporter résumé k6,
+séries Prometheus et manifeste;
+:Valider checks, erreurs
+et couverture télémétrique;
 
-if (5 répétitions réalisées ?) then (Non)
-  :Rejouer le scénario;
+if (5 répétitions par scénario ?) then (Non)
+  :Alterner le scénario
+et rejouer le run suivant;
 else (Oui)
-  :Consolider moyenne,
-min, max et tendances;
+  :Consolider moyenne, min, max,
+coefficient de variation et pics;
+  :Choisir les runs représentatifs
+par règle médiane;
+  :Capturer Grafana pour
+les deux runs représentatifs;
   :Comparer les protocoles;
   :Analyser les compromis;
 endif

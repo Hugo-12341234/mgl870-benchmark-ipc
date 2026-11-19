@@ -10,6 +10,8 @@ dérive temporelle de l’hôte.
 Chaque exécution redémarre les quatre serveurs, attend que les ports soient
 disponibles, lance k6 avec un identifiant unique, laisse les dernières métriques
 être envoyées, puis exporte les séries Prometheus du créneau exact du test.
+Après les dix exécutions, la même commande consolide les résultats et lance les
+75 contrôles d’intégrité de la suite.
 
 ## Avant la campagne
 
@@ -63,7 +65,9 @@ results/rerun_<horodatage>/
 │   ├── per_run_results.csv
 │   ├── consolidated_results.csv
 │   ├── consolidated_results.md
-│   └── representative_runs.md
+│   ├── representative_runs.md
+│   ├── validation_report.md
+│   └── validation_report.json
 └── screenshots/
     ├── individual/
     └── batch/
@@ -86,6 +90,8 @@ Pour l’ensemble de la campagne :
   répétitions et étendue du p99;
 - `summary/representative_runs.md` : run et `testid` à sélectionner pour les captures
   Grafana selon une règle déterministe.
+- `summary/validation_report.md` et `summary/validation_report.json` : résultat
+  lisible et résultat structuré des contrôles d’intégrité de la campagne.
 
 Ces fichiers sont les preuves numériques principales. Les captures Grafana
 servent à montrer la forme temporelle, la saturation et l’observabilité.
@@ -121,3 +127,12 @@ valeurs sans appliquer ce facteur de conversion.
 4. Choisir les deux runs représentatifs avant de remplacer les figures et les
    tableaux du rapport.
 5. Archiver le répertoire complet de la campagne avec la remise.
+
+La commande de campagne exécute automatiquement cette validation. Pour la
+relancer séparément sur une campagne existante :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\validate_benchmark_suite.ps1 -OutputDirectory rerun_<horodatage>
+```
+
+Le script vérifie les dix triplets d’artefacts, les checks sémantiques, les taux d’erreur, les métriques par protocole, la couverture Prometheus, les identifiants uniques, le commit, Docker et l’hôte. Il produit `summary/validation_report.md` et `summary/validation_report.json`.

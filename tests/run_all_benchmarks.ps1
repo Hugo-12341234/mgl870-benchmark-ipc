@@ -50,6 +50,10 @@ for ($run = 1; $run -le $runs; $run++) {
 
 & (Join-Path $PSScriptRoot "summarize_results.ps1") -OutputDirectory $OutputDirectory
 
+if (-not $Quick) {
+    & (Join-Path $PSScriptRoot "validate_benchmark_suite.ps1") -OutputDirectory $OutputDirectory
+}
+
 $screenshotsDirectory = Join-Path $targetDirectory "screenshots"
 New-Item -ItemType Directory -Force -Path (Join-Path $screenshotsDirectory "individual") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $screenshotsDirectory "batch") | Out-Null

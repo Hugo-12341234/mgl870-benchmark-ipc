@@ -56,5 +56,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\validate_latency_units
 ```
 
 Le résumé k6 est écrit dans
-`results/latency_unit_validation_summary.json`. Le script arrête ensuite
+`results/validation/latency_unit_validation_summary.json`. Le script arrête ensuite
 Prometheus sans supprimer le volume de validation.

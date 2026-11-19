@@ -10,7 +10,7 @@ Une comparaison de performance est difficile à défendre si elle ne conserve qu
 
 ## Décision
 
-Utiliser k6 pour les métriques applicatives, Prometheus pour leur collecte, cAdvisor et `docker-metrics` pour les métriques de conteneurs, et Grafana pour l’exploration temporelle. Conserver les scripts, la configuration Docker, le contrat `.proto`, les JSON de chaque run, les captures Grafana, les dashboards et les sources PlantUML dans le dépôt.
+Utiliser k6 pour les métriques applicatives, Prometheus pour leur collecte, cAdvisor et `docker-metrics` pour les métriques des serveurs et du générateur, et Grafana pour l’exploration temporelle. Conserver pour chaque run le résumé k6, l’export Prometheus et le manifeste d’environnement, ainsi que les scripts, la configuration Docker, le contrat `.proto`, les captures représentatives, les dashboards et les sources PlantUML.
 
 ## Options considérées
 
@@ -20,7 +20,7 @@ Utiliser k6 pour les métriques applicatives, Prometheus pour leur collecte, cAd
 
 ## Justification
 
-La troisième option permet de vérifier les checks, la saturation CPU, les tendances temporelles et la stabilité inter-runs. Elle distingue les données quantitatives des illustrations et évite de choisir une capture sans conserver les autres runs.
+La troisième option permet de vérifier les checks, la saturation CPU, les itérations abandonnées, les tendances temporelles et la stabilité inter-runs. Une règle déterministe sélectionne les captures représentatives après consolidation des cinq répétitions.
 
 ## Conséquences
 
@@ -28,4 +28,4 @@ Le dépôt contient davantage d’artefacts et exige une organisation claire des
 
 ## Preuves disponibles
 
-Les répertoires `results/`, `docs/screenshots/`, `grafana/`, `tests/`, `proto/`, `docs/figures/` et `docs/adr/` rendent la chaîne d’expérimentation auditable.
+La campagne officielle `results/rerun_20261119-104900/`, ses rapports de validation, `docs/screenshots/rerun/`, `grafana/`, `tests/`, `proto/`, `docs/figures/` et `docs/adr/` rendent la chaîne d’expérimentation auditable. L’ancienne campagne numérique est conservée sous `results/archive/legacy_pre_validation/` et ses captures sous `docs/screenshots/archive/legacy_pre_validation/`.

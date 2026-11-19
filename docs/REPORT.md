@@ -16,7 +16,7 @@ Ce rapport présente une évaluation expérimentale de REST, GraphQL, JSON-RPC e
 
 Les résultats étudiés mettent en évidence un point de bascule plutôt qu’un classement universel. Pour les messages unitaires, REST obtient les meilleurs résultats dans la configuration observée, ce qui indique que les coûts associés à la pile gRPC et au multiplexage HTTP/2 peuvent dépasser le bénéfice de la sérialisation binaire lorsque le payload est très petit. Pour les lots de 500 ticks, gRPC conserve au contraire une latence et un débit nettement plus favorables que les alternatives textuelles, dont le coût de parsing devient dominant sous contrainte CPU. Cette opposition constitue le résultat architectural central de l’étude : le choix du protocole doit être conditionné par le volume de données par requête, la pression sur le processeur et la valeur accordée à l’opérabilité.
 
-La contribution de ce travail est ainsi double. Premièrement, il fournit des mesures reproductibles sur un système volontairement réduit afin d’isoler le coût mécanique de la communication. Deuxièmement, il transforme ces mesures en une analyse de décision architecturale : quand la simplicité et la lisibilité des protocoles textuels restent-elles préférables, et à partir de quelle charge l’efficacité de gRPC justifie-t-elle la complexité supplémentaire de ses contrats et de son outillage? La portée des conclusions demeure liée à l’environnement expérimental et aux scénarios évalués; elles ne prétendent pas établir une supériorité générale d’un protocole.
+La contribution de ce travail est ainsi double. Premièrement, il fournit des mesures reproductibles sur un système volontairement réduit afin d’isoler le coût mécanique de la communication. Deuxièmement, il transforme ces mesures en une analyse de décision architecturale : quand la simplicité et la lisibilité des protocoles textuels restent-elles préférables, et dans quelles conditions de charge l’efficacité de gRPC justifie-t-elle la complexité supplémentaire de ses contrats et de son outillage? La portée des conclusions demeure liée à l’environnement expérimental et aux scénarios évalués; elles ne prétendent pas établir une supériorité générale d’un protocole.
 
 ## 2. Contexte et motivation
 
@@ -69,7 +69,7 @@ Le rapport cherchera donc à établir une conclusion conditionnelle : les protoc
 
 La question centrale de cette étude est la suivante :
 
-> **Dans un environnement d’ingestion soumis à une contrainte CPU, à partir de quel volume de charge utile les gains d’efficacité mécanique de gRPC justifient-ils son coût supplémentaire en opérabilité et en couplage contractuel par rapport à REST, GraphQL et JSON-RPC?**
+> **Dans un environnement d’ingestion soumis à une contrainte CPU, dans quelles conditions de volume de charge utile les gains d’efficacité mécanique de gRPC deviennent-ils suffisants pour justifier son coût supplémentaire en opérabilité et en couplage contractuel par rapport à REST, GraphQL et JSON-RPC?**
 
 Cette formulation décrit une décision architecturale conditionnelle. Elle ne cherche pas à établir qu’un protocole est toujours supérieur aux autres. Elle cherche plutôt à relier le choix du protocole à deux variables indépendantes qui peuvent modifier le compromis : la taille du message et la pression exercée sur les ressources de calcul.
 
@@ -163,7 +163,7 @@ Le générateur k6 enregistre la durée des requêtes, le nombre de requêtes, l
 
 ![Diagramme de déploiement du banc d’essai](figures/architecture.png)
 
-**Figure 1 —** Diagramme de déploiement du banc d’essai. Le générateur k6 se trouve en amont des quatre conteneurs évalués; le réseau Docker les regroupe avec la chaîne d’observabilité. Les flèches de requêtes distinguent les endpoints REST, GraphQL, JSON-RPC et gRPC, tandis que les flèches de métriques montrent le chemin vers Prometheus et Grafana. Cette figure est l’export du fichier source [`docs/figures/architecture.puml`](figures/architecture.puml).
+**Figure 1 —** Diagramme de déploiement du banc d’essai. Le générateur k6 se trouve en amont des quatre répliques isolées de la même image; le réseau Docker les regroupe avec la chaîne d’observabilité. Les flèches de requêtes distinguent les endpoints REST, GraphQL, JSON-RPC et gRPC, tandis que les flèches de métriques montrent le chemin vers Prometheus et Grafana. Cette figure est l’export du fichier source [`docs/figures/architecture.puml`](figures/architecture.puml).
 
 ### 6.4. Contexte d’interprétation
 
@@ -175,7 +175,7 @@ Cette distinction entre système étudié et système de production est essentie
 
 ### 7.1. Vue d’ensemble de l’architecture
 
-L’architecture expérimentale est organisée autour d’un hôte Docker et d’un réseau privé commun nommé `mgl870-benchmark`. Le banc d’essai comporte trois groupes de composants : la génération de charge, les services évalués et l’observabilité. Les quatre services évalués sont construits à partir du même projet Rust, mais sont lancés dans quatre conteneurs distincts afin que la limite CPU puisse être appliquée séparément à chaque variante.
+L’architecture expérimentale est organisée autour d’un hôte Docker et d’un réseau privé commun nommé `mgl870-benchmark`. Le banc d’essai comporte trois groupes de composants : la génération de charge, les services évalués et l’observabilité. Les quatre services évalués sont des répliques du même artefact Rust, lancées dans quatre conteneurs distincts afin que la limite CPU puisse être appliquée séparément à chaque variante. Le binaire contient les quatre adaptateurs; dans chaque réplique, seul celui ciblé par k6 reçoit la charge, tandis que les autres listeners restent inactifs. Cette symétrie évite que des images ou des chemins de construction distincts deviennent une variable supplémentaire.
 
 Le scénario k6 unitaire appelle les opérations d’ingestion d’un seul tick. Le scénario k6 par lots appelle les opérations correspondantes avec un tableau ou un message contenant 500 ticks. Les requêtes sont dirigées vers les conteneurs REST, GraphQL, JSON-RPC et gRPC par leurs noms de service Docker. Les services ne communiquent pas entre eux : chaque variante reçoit une charge comparable et produit un résultat indépendant.
 
@@ -226,8 +226,10 @@ Les décisions importantes sont conservées comme des ADRs dans `docs/adr/`. Ell
 | [ADR-005](adr/ADR-005-choix-de-rust.md) | Utiliser Rust pour les quatre serveurs | Réduire les variations d’environnement d’exécution |
 | [ADR-006](adr/ADR-006-profiles-de-charge-k6.md) | Utiliser des profils k6 progressifs et soutenus | Observer la montée en saturation et la stabilité |
 | [ADR-007](adr/ADR-007-observabilite-et-reproductibilite.md) | Centraliser les métriques et conserver les artefacts | Rendre les observations auditables et reproductibles |
+| [ADR-008](adr/ADR-008-unites-et-source-de-verite.md) | Expliciter les unités et privilégier les données numériques | Éviter qu’une métadonnée d’affichage altère l’interprétation |
+| [ADR-009](adr/ADR-009-artefact-commun-conteneurs-isoles.md) | Répliquer un artefact commun dans quatre conteneurs isolés | Conserver une base logicielle identique tout en isolant les ressources |
 
-Ces décisions forment une chaîne cohérente. Le choix des quatre protocoles définit les alternatives; le traitement minimal limite les variables parasites; la contrainte CPU rend les différences observables; les scénarios et l’observabilité produisent les preuves nécessaires à la comparaison.
+Ces décisions forment une chaîne cohérente. Le choix des quatre protocoles définit les alternatives; le traitement minimal limite les variables parasites; l’artefact commun contrôle la base logicielle; les conteneurs et la contrainte CPU isolent les ressources; les scénarios et l’observabilité produisent les preuves nécessaires à la comparaison.
 
 ### 7.5. ADRs complets
 
@@ -279,23 +281,23 @@ Les ADRs sont conservés séparément dans `docs/adr/` pour faciliter leur maint
 
 **Conséquences.** La configuration est utile pour un environnement contraint, mais Windows, WSL2/Hyper-V et la virtualisation réseau restent des menaces à la validité.
 
-**Preuves attendues.** `docker-compose.yml` et captures Grafana montrant le plafonnement proche de 25 %.
+**Preuves attendues.** `docker-compose.yml` et captures Grafana montrant la limite commune, son atteinte par les services saturés et la marge éventuelle d’un service qui maintient la cible.
 
 #### ADR-004 — Utiliser deux scénarios k6 et une observabilité centralisée
 
 **Statut :** Acceptée. **Date :** 2026-10-07. **Décideurs :** Projet MGL870.
 
-**Contexte.** La question porte sur l’effet du volume de payload; il faut comparer un appel individuel et une ingestion par lot avec les ressources observées.
+**Contexte.** La question porte sur l’effet du volume de charge utile. Il faut comparer un appel individuel et une ingestion par lot, tout en observant la latence, le débit, les erreurs et les ressources.
 
-**Décision.** Utiliser `load_test.js` pour un tick et `load_test_batch.js` pour 500 ticks, avec `ramping-arrival-rate`, export JSON, Prometheus, cAdvisor, `docker-metrics` et Grafana.
+**Décision.** Utiliser `load_test.js` pour un tick et `load_test_batch.js` pour 500 ticks. Le lot de 500 constitue un contraste expérimental volontairement important : il amortit le coût fixe d’une requête sur plusieurs objets et rend visible le coût d’une charge utile volumineuse, tout en demeurant exécutable avec la mémoire et le générateur disponibles. Les scénarios utilisent `ramping-arrival-rate` et un `testid` unique. Chaque run conserve un résumé k6, un export Prometheus et un manifeste; `docker-metrics` et Grafana complètent l’observabilité.
 
-**Options considérées.** Appels unitaires seulement; lots seulement; deux tailles avec télémétrie commune.
+**Options considérées.** Appels unitaires seulement; lots seulement; deux tailles fortement contrastées avec télémétrie commune; série complète de tailles intermédiaires, par exemple 1, 10, 50, 100, 250 et 500 ticks.
 
-**Justification.** Deux tailles permettent de tester un point de bascule et de relier mesures applicatives et ressources.
+**Justification.** Les deux tailles permettent de tester un changement de compromis dans le temps disponible tout en conservant cinq répétitions. La taille de 500 n’est ni une taille universelle ni une prévision exacte d’une charge financière de production; elle crée un régime où sérialisation, parsing et transfert prennent davantage de place. Tester toutes les tailles aurait mieux localisé le point de bascule, mais aurait multiplié la durée de campagne ou réduit les répétitions. Pour le batch, le débit est exprimé en requêtes/s et en ticks/s afin qu’un lot ne soit pas interprété comme une seule unité de travail utile.
 
-**Conséquences.** Les deux scénarios ne couvrent pas les tailles intermédiaires; le seuil doit être présenté comme une borne.
+**Conséquences.** Le classement peut être comparé entre deux régimes, mais les tailles intermédiaires ne sont pas couvertes. Le point de bascule est donc borné entre 1 et 500 ticks, sans être précisément localisé. Une étude du seuil devrait ajouter les tailles intermédiaires sans modifier les autres facteurs.
 
-**Preuves attendues.** Scripts k6, JSON, dashboards et captures Grafana.
+**Preuves attendues.** Scripts k6, résumés, exports Prometheus, manifestes, dashboards et captures Grafana.
 
 #### ADR-005 — Utiliser Rust pour les serveurs évalués
 
@@ -317,17 +319,17 @@ Les ADRs sont conservés séparément dans `docs/adr/` pour faciliter leur maint
 
 **Statut :** Acceptée. **Date :** 2026-10-16. **Décideurs :** Projet MGL870.
 
-**Contexte.** Un pic instantané ne distingue pas une variation transitoire d’une saturation soutenue.
+**Contexte.** La question porte sur le comportement des protocoles lorsque la taille du payload et la pression CPU augmentent. Un pic instantané ne distingue pas une variation transitoire d’une saturation soutenue, et un nombre fixe de VUs rendrait la cadence dépendante des temps de réponse.
 
-**Décision.** Utiliser `ramping-arrival-rate`: unitaire à 2 000, 4 000 puis 6 000 req/s sur 10 minutes; batch à 100 puis 500 req/s sur 7 minutes, avec six minutes au palier 500. Les VUs sont préalloués au maximum.
+**Décision.** Utiliser `ramping-arrival-rate` : unitaire de 0 à 2 000, puis 4 000 et 6 000 req/s sur 10 minutes; batch de 0 à 100, puis 500 req/s, suivi d’un plateau de quatre minutes à 500. Les plafonds sont de 4 000 VUs par scénario unitaire et 1 500 VUs par scénario batch. Les cibles sont définies par protocole : les quatre scénarios parallèles demandent donc au maximum 24 000 req/s agrégées en unitaire et 2 000 req/s en batch. Ces valeurs sont des cadences offertes, pas des débits garantis.
 
-**Options considérées.** Charge constante; pic court; montée progressive suivie d’un plateau.
+**Options considérées.** Nombre fixe de VUs; charge constante; pic court; cadence d’arrivée progressive suivie d’un plateau soutenu.
 
-**Justification.** La montée montre la dégradation et le plateau rend la saturation mesurable dans le temps. Les durées restent répétables cinq fois.
+**Justification.** `ramping-arrival-rate` sépare la charge demandée de la vitesse des réponses et comptabilise les itérations que les VUs ne peuvent pas démarrer. Les cibles de 6 000 et 500 req/s par protocole ne sont ni des prévisions de production ni des SLO. Les exécutions préliminaires ont vérifié qu’elles traversaient une zone allant du fonctionnement stable à la saturation sur l’hôte disponible. La montée montre l’apparition de la dégradation; le plateau batch de quatre minutes vérifie sa persistance. Les plafonds de VUs protègent l’hôte et rendent l’incapacité à suivre la cadence observable plutôt que de déplacer indéfiniment la file dans le générateur.
 
-**Conséquences.** Les profils mesurent une capacité soutenue et non une rafale ni un seuil continu exact; le point de bascule est encadré entre 1 et 500 ticks.
+**Conséquences.** Les profils mesurent une capacité soutenue, et non une rafale, une capacité maximale absolue ou un seuil continu exact. Les cadences offertes doivent être distinguées du débit servi. Leur niveau dépend de l’hôte, de la limite CPU, des bibliothèques et des VUs; une autre plateforme devrait recalibrer les cibles tout en conservant le principe de traverser la saturation.
 
-**Preuves disponibles.** Scripts k6, dix JSON, captures Grafana et ADRs.
+**Preuves disponibles.** Scripts k6, dix résumés, dix exports Prometheus, dix manifestes, captures représentatives et ADRs.
 
 #### ADR-007 — Centraliser l’observabilité et conserver les artefacts
 
@@ -335,19 +337,51 @@ Les ADRs sont conservés séparément dans `docs/adr/` pour faciliter leur maint
 
 **Contexte.** Une comparaison est difficile à défendre sans relier latence et débit aux ressources ni conserver les données sources.
 
-**Décision.** Utiliser k6, Prometheus, cAdvisor, `docker-metrics` et Grafana, et conserver scripts, Docker Compose, `.proto`, JSON, captures, dashboards et sources PlantUML.
+**Décision.** Utiliser k6, Prometheus, cAdvisor, `docker-metrics` et Grafana, observer aussi le générateur, et conserver pour chaque run le résumé k6, l’export Prometheus et le manifeste, ainsi que les scripts, captures, dashboards et sources PlantUML.
 
 **Options considérées.** Résumés k6 seulement; captures manuelles seulement; combinaison des sources et de la télémétrie.
 
-**Justification.** La combinaison vérifie les checks, la saturation, les tendances temporelles et la stabilité inter-runs.
+**Justification.** La combinaison vérifie les checks, la saturation, les itérations abandonnées, les tendances temporelles et la stabilité inter-runs. Une règle déterministe sélectionne les captures représentatives.
 
 **Conséquences.** Le dépôt contient plus d’artefacts, mais les captures illustrent tandis que JSON et séries Prometheus vérifient quantitativement.
 
-**Preuves disponibles.** `results/`, `docs/screenshots/`, `grafana/`, `tests/`, `proto/`, `docs/figures/` et `docs/adr/`.
+**Preuves disponibles.** `results/rerun_20261119-104900/`, `docs/screenshots/rerun/`, `grafana/`, `tests/`, `proto/`, `docs/figures/` et `docs/adr/`; l’ancienne campagne numérique est séparée dans `results/archive/legacy_pre_validation/` et ses captures dans `docs/screenshots/archive/legacy_pre_validation/`.
+
+#### ADR-008 — Expliciter les unités et privilégier les données numériques
+
+**Statut :** Acceptée. **Date :** 2026-11-18. **Décideurs :** Projet MGL870.
+
+**Contexte.** Les résumés k6 expriment les tendances temporelles en millisecondes, tandis que la sortie Prometheus remote write les stocke en secondes. Les premiers dashboards déclaraient incorrectement l’unité `ms`; les courbes et leur classement étaient cohérents, mais les valeurs absolues étaient affichées avec une unité erronée.
+
+**Décision.** Déclarer les panneaux Grafana en secondes, conserver les percentiles par protocole dans les résumés k6 en millisecondes et archiver les séries Prometheus avec leur unité native. Les fichiers numériques sont les sources de vérité; les captures illustrent le comportement temporel.
+
+**Options considérées.** Conserver les anciens dashboards et corriger seulement le texte; convertir les requêtes PromQL en millisecondes; déclarer l’unité native, documenter la conversion et conserver les deux sources.
+
+**Justification.** La dernière option élimine une conversion implicite et permet un audit croisé. Un test synthétique d’une seconde a confirmé qu’une tendance k6 de `1000` ms est écrite comme `1` dans Prometheus, tandis qu’une tendance sans unité conserve `1000`.
+
+**Conséquences.** Les résultats absolus doivent être corrigés, mais le classement et les formes temporelles de l’ancienne campagne restent comparables. Cette campagne est archivée et la campagne validée du 19 novembre devient la preuve officielle.
+
+**Preuves disponibles.** [`docs/validation/latency-units.md`](validation/latency-units.md), `results/validation/latency_unit_validation_summary.json`, dashboards corrigés, résumés k6, exports Prometheus et captures officielles.
+
+#### ADR-009 — Répliquer un artefact commun dans quatre conteneurs isolés
+
+**Statut :** Acceptée. **Date :** 2026-11-19. **Décideurs :** Projet MGL870.
+
+**Contexte.** La comparaison doit éviter deux biais opposés : un processus partagé créerait de la contention entre protocoles, tandis que quatre applications indépendantes pourraient diverger par leur code, leur construction et leur environnement.
+
+**Décision.** Construire un seul binaire et une seule image contenant les adaptateurs REST, GraphQL, JSON-RPC et gRPC ainsi que le modèle commun `Tick`, puis répliquer cette image dans quatre conteneurs. k6 dirige chaque protocole vers son conteneur dédié. Chaque réplique démarre le même binaire, mais seul l’adaptateur ciblé reçoit la charge; les autres listeners restent inactifs. Chaque conteneur possède sa limite de `0,25` vCPU, ses 512 MiB et ses métriques.
+
+**Options considérées.** Quatre protocoles dans un conteneur partageant ses ressources; quatre applications et images indépendantes; artefact commun répliqué dans quatre conteneurs; quatre binaires spécialisés construits à partir d’un noyau commun.
+
+**Justification.** L’artefact commun maintient identiques le compilateur, les dépendances partagées, le modèle, le traitement de succès, l’image de base et les options de compilation. Les quatre répliques isolent simultanément CPU, mémoire et réseau, de sorte que les métriques puissent être attribuées à un protocole. Des binaires spécialisés auraient supprimé les adaptateurs inactifs, mais ajouté plusieurs cibles de compilation et un risque de divergence. Le faible coût des listeners inactifs est accepté pour maximiser la symétrie.
+
+**Conséquences.** La validité interne et l’uniformité du déploiement sont renforcées. En contrepartie, les conteneurs ne représentent pas quatre images de production minimales : chacun contient des bibliothèques et listeners non sollicités. Leur coût de repos est symétrique, mais non nul; les résultats portent sur cette architecture expérimentale commune.
+
+**Preuves disponibles.** `src/main.rs`, `Dockerfile`, `docker-compose.yml`, les diagrammes `components.puml` et `architecture.puml`, les métriques par conteneur et les manifestes officiels.
 
 ### 7.6. Conséquences architecturales des décisions
 
-L’architecture favorise la validité interne de la comparaison au prix d’une représentativité réduite d’un système de production. Les variantes sont comparables parce qu’elles exécutent peu de logique et disposent de la même limite de ressources. En revanche, les résultats ne mesurent pas l’effet d’une base de données, d’une logique métier, de la sécurité TLS, de la découverte de services ou d’un déploiement multi-hôtes.
+L’architecture favorise la validité interne de la comparaison au prix d’une représentativité réduite d’un système de production. Les variantes sont comparables parce qu’elles proviennent du même artefact, exécutent peu de logique dans des conteneurs séparés et disposent de la même limite de ressources. En revanche, chaque réplique contient aussi les adaptateurs inactifs de l’artefact commun, et les résultats ne mesurent pas l’effet d’une base de données, d’une logique métier, de TLS, de la découverte de services ou d’un déploiement multi-hôtes.
 
 Une autre conséquence est que l’observabilité fait partie de l’architecture expérimentale, mais pas du chemin applicatif évalué. Prometheus, Grafana et cAdvisor rendent les résultats interprétables sans devenir des composants que le protocole devrait traverser pour répondre au client. Cette distinction sera importante dans l’analyse des menaces à la validité.
 
@@ -357,11 +391,11 @@ Une autre conséquence est que l’observabilité fait partie de l’architectur
 
 L’étude adopte une comparaison contrôlée à deux facteurs principaux : le protocole de communication et la taille de la charge utile. Le langage, le modèle de données, le traitement applicatif, le déploiement conteneurisé et la limite de ressources sont maintenus constants entre les variantes. Chaque exécution k6 lance simultanément quatre scénarios nommés `rest`, `graphql`, `jsonrpc` et `grpc`; une répétition compare donc les quatre protocoles dans les mêmes conditions générales.
 
-Deux séries indépendantes de cinq répétitions ont été réalisées : cinq runs du scénario unitaire et cinq runs du scénario par lots. Les fichiers `k6_results_run1.json` à `k6_results_run5.json` et `k6_batch_results_run1.json` à `k6_batch_results_run5.json` sont conservés dans `results/`. Les captures Grafana correspondantes sont classées dans `docs/screenshots/individual_run_1/` à `individual_run_5/` et `docs/screenshots/batch_run_1/` à `batch_run_5/`.
+Deux séries de cinq répétitions ont été réalisées le 19 novembre 2026 : cinq runs unitaires et cinq runs batch, alternés afin de répartir une éventuelle dérive temporelle de l’hôte. La campagne officielle est isolée dans [`results/rerun_20261119-104900/`](../results/rerun_20261119-104900/). Chaque run possède son dossier avec `k6_summary.json`, `prometheus.json` et `manifest.json`. Les captures officielles se trouvent dans [`docs/screenshots/rerun/`](screenshots/rerun/); les données et captures de l’ancienne campagne sont clairement séparées dans leurs répertoires `archive/legacy_pre_validation/` respectifs.
 
-Les répétitions servent à mesurer la stabilité des tendances, et non à prétendre à une inférence statistique générale. Les résultats sont synthétisés par moyenne, médiane, minimum et maximum entre les runs pour les métriques agrégées; les captures représentatives sont choisies selon une règle a priori décrite en section 9. Les résultats par protocole restent issus des séries Grafana, car le résumé JSON n’exporte pas les percentiles de la métrique personnalisée séparément pour chaque tag `protocol`.
+Les répétitions servent à mesurer la stabilité des tendances, et non à prétendre à une inférence statistique générale. Les résultats sont synthétisés par moyenne, minimum, maximum et coefficient de variation (CV) entre les runs. Des seuils tagués forcent k6 à conserver les compteurs et percentiles séparément pour chaque protocole; les exports Prometheus fournissent en plus les séries temporelles. Pour chaque workload, le run représentatif est choisi automatiquement comme celui dont la moyenne des quatre p99 est la plus proche de la médiane des cinq moyennes de run.
 
-Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, démarrage de l’environnement, application de la limite CPU, sélection du scénario, exécution des quatre protocoles, collecte des métriques, archivage du JSON et des captures, redémarrage, puis consolidation des cinq répétitions.
+Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, application des limites, attribution d’un `testid`, redémarrage et vérification des serveurs, exécution des quatre protocoles, export des trois artefacts par run, validation, alternance des scénarios, consolidation des cinq répétitions et sélection déterministe des captures représentatives.
 
 ![Workflow expérimental reproductible](figures/experiment-workflow.png)
 
@@ -369,7 +403,7 @@ Le workflow expérimental complet est documenté dans [`docs/figures/experiment-
 
 ### 8.2. Scénario unitaire
 
-Le scénario unitaire transmet toujours le même tick : symbole `SHOP`, prix `115.42`, volume `100` et timestamp `1700000000`. Le profil `ramping-arrival-rate` comprend 2 000 requêtes/s pendant 3 minutes, 4 000 requêtes/s pendant 3 minutes, puis 6 000 requêtes/s pendant 4 minutes. Chaque scénario réserve 4 000 VUs et autorise au maximum 4 000 VUs.
+Le scénario unitaire transmet toujours le même tick : symbole `SHOP`, prix `115.42`, volume `100` et timestamp `1700000000`. Pour chacun des quatre protocoles, le profil `ramping-arrival-rate` monte de 0 à 2 000 requêtes/s sur 3 minutes, puis à 4 000 sur 3 minutes et à 6 000 sur 4 minutes. La cible agrégée maximale est donc de 24 000 requêtes/s, réparties entre quatre scénarios indépendants. Chaque scénario réserve 4 000 VUs et autorise au maximum 4 000 VUs. La cible est une cadence demandée; le débit effectivement servi et les itérations abandonnées sont rapportés séparément.
 
 Le script configure des seuils de p95 inférieur à 1 000 ms, de p99 inférieur à 2 000 ms et de taux d’erreur inférieur à 1 %. Les seuils de latence sont dépassés dans les cinq runs sous la charge soutenue; cette violation est un résultat de saturation et non un critère d’exclusion, puisque les checks HTTP/gRPC restent réussis et que le taux d’erreur demeure nul.
 
@@ -377,38 +411,37 @@ Le script configure des seuils de p95 inférieur à 1 000 ms, de p99 inférieur 
 
 Le scénario par lots réutilise le même tick et construit une charge de 500 éléments. REST, GraphQL et JSON-RPC transportent le lot dans une représentation JSON; gRPC le transmet dans le champ répété `ticks` du message `TickList` défini dans [`proto/tick.proto`](../proto/tick.proto).
 
-Le profil comprend 100 requêtes/s pendant 1 minute, puis 500 requêtes/s pendant 2 minutes et 500 requêtes/s pendant 4 minutes supplémentaires. La cible de 500 requêtes/s est donc maintenue pendant 6 minutes, ce qui permet d’observer une saturation soutenue plutôt qu’un pic bref. Chaque scénario réserve 1 500 VUs et autorise au maximum 1 500 VUs. Comme une requête contient 500 ticks, le débit de requêtes et le débit de ticks sont rapportés séparément.
+Pour chacun des quatre protocoles, le profil monte de 0 à 100 requêtes/s sur 1 minute, puis à 500 sur 2 minutes et maintient 500 requêtes/s pendant 4 minutes. La cible agrégée maximale est donc de 2 000 requêtes batch/s; chaque scénario réserve et autorise au maximum 1 500 VUs. Comme une requête contient 500 ticks, le débit de requêtes et le débit de ticks sont rapportés séparément. Les cibles servent à traverser la saturation sur l’hôte expérimental; elles ne représentent ni une prévision de production ni un SLO.
 
 ### 8.4. Environnement et isolation
 
 Les quatre serveurs sont lancés dans des conteneurs distincts construits à partir du même `Dockerfile`. Docker Compose applique à chaque serveur une limite de `0,25` vCPU et 512 MiB de mémoire. Les ports sont `8081` pour REST, `8082` pour GraphQL, `8083` pour JSON-RPC et `50051` pour gRPC. Les conteneurs partagent le réseau Docker `mgl870-benchmark`, mais chaque variante possède son propre processus serveur.
 
-Avant chaque run, l’environnement est arrêté puis redémarré afin de réduire la contamination entre essais. Les limites CPU ne constituent pas une propriété intrinsèque des protocoles : elles créent une condition expérimentale commune destinée à rendre visibles les coûts de parsing, de désérialisation et de transport. L’exécution reste susceptible d’être influencée par Windows, WSL2/Hyper-V et la virtualisation réseau.
+Avant chaque run, les quatre conteneurs serveurs sont redémarrés, leurs ports sont vérifiés et une pause de stabilisation est appliquée. Prometheus et Grafana restent actifs afin de conserver la continuité des données, tandis qu’un `testid` unique empêche le mélange des séries. Les limites CPU ne constituent pas une propriété intrinsèque des protocoles : elles créent une condition commune destinée à rendre visibles les coûts relatifs. L’exécution reste susceptible d’être influencée par Windows, WSL2/Hyper-V et la virtualisation réseau.
 
 ### 8.5. Mesures collectées
 
-Les scripts k6 enregistrent la durée personnalisée (`protocol_request_duration` ou `batch_protocol_request_duration`), le nombre de requêtes, les erreurs et le taux d’erreur. Les métriques natives HTTP et gRPC sont également conservées lorsque k6 les expose. Prometheus reçoit les métriques k6; cAdvisor et `docker-metrics` fournissent l’utilisation CPU, la mémoire et le trafic réseau des conteneurs; Grafana affiche les séries temporelles et les percentiles p50, p95 et p99.
+Les scripts k6 enregistrent la durée personnalisée (`protocol_request_duration` ou `batch_protocol_request_duration`), le nombre de requêtes, les erreurs et le taux d’erreur par protocole. Les checks valident aussi la sémantique des réponses GraphQL et JSON-RPC, et non seulement leur statut HTTP. Prometheus reçoit les métriques k6; `docker-metrics` fournit l’utilisation CPU, la mémoire et le trafic réseau des serveurs ainsi que les ressources du générateur k6. Grafana affiche les séries temporelles et les percentiles p50, p95 et p99.
 
-Le p50 décrit le comportement typique, tandis que le p95 et le p99 rendent visibles les files d’attente et la dégradation de la queue de distribution. Pour les lots, le débit de ticks est calculé comme le débit de requêtes multiplié par 500. Les valeurs de débit et de latence lues dans les captures sont des valeurs de régime approximatives; elles ne remplacent pas une extraction numérique complète des séries Prometheus.
+Les résumés k6 expriment les durées en millisecondes. Le remote write k6 exprime les tendances temporelles en secondes dans Prometheus; les dashboards déclarent donc l’unité `s` et Grafana adapte automatiquement l’échelle en `ms` lorsque nécessaire. Cette convention a été vérifiée par le test synthétique documenté dans [`docs/validation/latency-units.md`](validation/latency-units.md). Chaque `prometheus.json` conserve explicitement `latency_unit: seconds`.
+
+Le p50 décrit le comportement typique, tandis que le p95 et le p99 rendent visibles les files d’attente et la dégradation de la queue de distribution. Pour les lots, le débit de ticks est le débit de requêtes multiplié par 500. Les tableaux utilisent les résumés numériques et les exports Prometheus; les captures servent uniquement à montrer la dynamique temporelle.
 
 ### 8.6. Critères de validité et reproductibilité
 
-Un run est conservé lorsqu’il est complet, que les quatre checks applicatifs ont zéro échec, que le taux d’erreur est nul et que les captures couvrent les indicateurs prévus. Les itérations abandonnées ne sont pas considérées comme des erreurs applicatives : elles indiquent que k6 n’a pas pu démarrer toute la charge demandée avec les VUs disponibles. Les seuils de latence k6, eux, sont des objectifs de service et non un filtre d’exclusion du run.
+Un run est conservé lorsqu’il est complet, que les quatre checks applicatifs ont zéro échec, que les taux d’erreur sont nuls, que les métriques par protocole sont présentes et que les requêtes Prometheus essentielles contiennent des séries. Les itérations abandonnées ne sont pas des erreurs applicatives : elles indiquent que k6 n’a pas pu démarrer toute la charge demandée avec les VUs disponibles. Les seuils de latence k6 sont des objectifs de saturation et non un filtre d’exclusion.
 
-Le protocole est reproductible à partir de [`docker-compose.yml`](../docker-compose.yml), des scripts [`tests/load_test.js`](../tests/load_test.js) et [`tests/load_test_batch.js`](../tests/load_test_batch.js), du contrat [`proto/tick.proto`](../proto/tick.proto), des dashboards Grafana, des dix fichiers JSON et des captures conservées dans le dépôt.
+Le validateur [`tests/validate_benchmark_suite.ps1`](../tests/validate_benchmark_suite.ps1) vérifie automatiquement les artefacts, les identités, les checks, les erreurs, la couverture télémétrique, le commit, la version Docker et l’hôte. La campagne officielle passe **75 contrôles sur 75**; le rapport produit se trouve dans [`summary/validation_report.md`](../results/rerun_20261119-104900/summary/validation_report.md).
 
 ### 8.7. Reproductibilité expérimentale
 
-La reproduction complète peut être effectuée à partir du dépôt, de Docker et de Docker Compose. Le protocole suit les étapes suivantes :
+La reproduction complète nécessite Docker Desktop et une seule commande PowerShell lancée à la racine du dépôt :
 
-1. construire et démarrer l’infrastructure avec `docker compose up -d --build`;
-2. attendre que les quatre serveurs, Prometheus et Grafana soient disponibles;
-3. lancer le scénario unitaire avec `docker compose --profile loadtest run --rm k6-single`;
-4. conserver le fichier `results/k6_results_run1.json` sous un nom correspondant au numéro du run et archiver les captures Grafana dans `docs/screenshots/individual_run_N/`;
-5. arrêter l’environnement avec `docker compose down`;
-6. répéter les étapes précédentes pour le scénario batch avec `k6-batch`, en conservant `k6_batch_results_runN.json` et `docs/screenshots/batch_run_N/`.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1
+```
 
-Les cinq répétitions de chaque scénario ont été conservées selon cette convention. Les artefacts nécessaires à l’audit sont répartis comme suit : `tests/` contient les générateurs de charge, `proto/` le contrat gRPC, `results/` les résumés JSON, `docs/screenshots/` les captures par run, `grafana/` les dashboards, `docs/figures/` les sources de diagrammes et `docs/adr/` les décisions architecturales.
+Le script construit l’environnement, alterne les dix runs, redémarre les serveurs, assigne les `testid`, exporte les données, vérifie chaque exécution et consolide les résultats. Le protocole détaillé, l’arborescence et la stratégie de captures sont décrits dans [`docs/benchmark-rerun.md`](benchmark-rerun.md). Les images Docker sont figées par digest; les manifestes consignent le commit `b94ba5352de06c167473d725d4a64bc6d0368223`, Docker `28.0.4`, Windows 11, le processeur Intel i5-10400, 12 processeurs logiques et 34 005 622 784 octets de mémoire.
 
 La reproductibilité doit être comprise à deux niveaux. Le protocole, les scripts, les limites de ressources et les métriques peuvent être reproduits directement. Les valeurs exactes de latence peuvent varier selon l’hôte, la version de Docker, Windows/WSL2 et la virtualisation; la propriété attendue est donc la reproduction des tendances et du raisonnement, pas l’égalité au milliseconde près.
 
@@ -420,91 +453,101 @@ La section 9 rapporte les observations consolidées sans leur attribuer automati
 
 ### 9.1. Intégrité et couverture des données
 
-Les cinq runs individuels ont duré entre 600,97 et 601,76 secondes. Les cinq runs batch ont duré entre 430,84 et 433,68 secondes. Pour chaque run, les checks REST, GraphQL, JSON-RPC et gRPC ont enregistré zéro échec et le taux d’erreur applicatif est resté nul. Les seuils de latence k6 ont été dépassés, ce qui est cohérent avec la saturation imposée et ne constitue pas une erreur de traitement.
+Les dix runs officiels sont présents, utilisent le profil complet et ont été exécutés sur le même hôte, avec le même commit et la même version de Docker. Les runs unitaires durent de 601,4 à 601,7 secondes; les runs batch, de 429,8 à 431,9 secondes. Les **6,39 millions** d’itérations unitaires et **428 598** itérations batch exécutées en moyenne ont produit zéro échec sémantique et un taux d’erreur nul. Les 75 contrôles automatisés de couverture et de cohérence passent.
 
-Les JSON exportent principalement des métriques agrégées sur les quatre scénarios. Ils ne permettent pas de calculer directement, pour chaque protocole, les p50/p95/p99 de la métrique personnalisée. Les comparaisons individuelles entre protocoles sont donc fondées sur les séries Grafana et leurs captures; les tableaux ci-dessous décrivent explicitement les agrégats JSON et ne les présentent pas comme des mesures par protocole.
+| Workload | Runs | Itérations exécutées moyennes | Abandons moyens | Taux d’abandon moyen | Étendue du taux | Checks échoués | Taux d’erreur |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Unitaire | 5 | 6 388 911 | 1 282 386 | 16,72 % | 15,25–18,25 % | 0 | 0 % |
+| Batch | 5 | 428 598 | 207 344 | 32,60 % | 31,06–35,21 % | 0 | 0 % |
 
-### 9.2. Stabilité agrégée des répétitions unitaires
+Les itérations abandonnées sont importantes, mais elles ne sont pas des réponses en erreur : elles n’ont jamais été démarrées. Elles montrent que le profil atteint intentionnellement une zone de capacité. Toutes les comparaisons ci-dessous utilisent le débit effectivement servi, et non la cadence demandée.
 
-Le tableau suivant ne compare pas REST, GraphQL, JSON-RPC et gRPC entre eux. Il résume les métriques agrégées par k6 sur les quatre protocoles afin de vérifier la répétabilité et le niveau de saturation des cinq répétitions. Il répond à la question méthodologique : **les runs unitaires ont-ils produit des observations suffisamment comparables pour être analysés ensemble?**
+### 9.2. Scénario unitaire : REST et JSON-RPC dominent les micro-messages
 
-| Métrique agrégée k6 | Moyenne des 5 runs | Minimum | Maximum |
-| --- | ---: | ---: | ---: |
-| Durée moyenne (`protocol_request_duration`) | 567,1 ms | 530,8 ms | 598,2 ms |
-| Médiane | 72,2 ms | 58 ms | 83 ms |
-| p90 | 2 491,2 ms | 2 467 ms | 2 546 ms |
-| p95 | 2 662,8 ms | 2 599 ms | 2 712 ms |
-| Itérations exécutées | 6 410 896 | 6 354 906 | 6 483 177 |
-| Itérations abandonnées | 1 264 481 | 1 195 812 | 1 323 266 |
+| Protocole | Débit moyen (req/s) | Pic moyen (req/s) | CV du débit | p50 moyen | p95 moyen | p99 moyen | Étendue p99 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| REST | 3 163,5 | 5 551,5 | 0,7 % | 11,6 ms | 800,8 ms | 1 024,8 ms | 947–1 171 ms |
+| JSON-RPC | 3 057,6 | 4 962,6 | 1,2 % | 36,4 ms | 1 203,6 ms | 1 356,2 ms | 1 291–1 457 ms |
+| GraphQL | 2 191,5 | 2 856,6 | 2,5 % | 117,2 ms | 2 838,4 ms | 3 076,8 ms | 2 885–3 379 ms |
+| gRPC | 2 207,7 | 2 958,7 | 2,7 % | 134,6 ms | 2 918,6 ms | 3 545,0 ms | 2 879–4 165 ms |
 
-Les cinq runs sont donc relativement cohérents sur la durée agrégée et les percentiles, malgré une saturation importante de l’injecteur. Les valeurs de la colonne « Moyenne des 5 runs » sont des moyennes des résumés de chaque run; elles ne constituent pas un recalcul poolé de toutes les observations individuelles. Les captures Grafana montrent systématiquement que REST conserve le meilleur débit de requêtes et la latence de queue la plus basse dans le scénario unitaire; JSON-RPC suit, tandis que GraphQL et gRPC plafonnent plus tôt dans cette configuration. Cette observation est répétée, mais les valeurs exactes par protocole ne doivent pas être reconstruites à partir de l’agrégat JSON.
+Le classement de débit est identique dans les cinq répétitions : REST, JSON-RPC, puis gRPC et GraphQL. Les CV de 0,7 à 2,7 % indiquent une forte répétabilité. Le run 1 est représentatif selon la règle médiane définie précédemment (`testid` `20261119-104900-individual-run1`).
 
-Le run individuel 3 est utilisé comme capture représentative, car sa durée agrégée (`566,6 ms`) est la plus proche de la médiane des cinq runs. Les quatre autres répertoires restent disponibles pour audit et comparaison.
+![Latence p99 du scénario unitaire](screenshots/rerun/individual_run_1/latency_p99.png)
 
-![Latence p99 du scénario unitaire](screenshots/individual_run_3/latency_p99.png)
+**Figure 6 —** Latence p99 du run unitaire représentatif. GraphQL et gRPC entrent plus tôt dans une file d’attente d’environ trois secondes; REST et JSON-RPC conservent une queue plus basse.
 
-**Figure 6 —** Latence p99 du run individuel représentatif. REST reste le plus bas dans la phase soutenue, alors que GraphQL et gRPC présentent une queue plus élevée.
+![Débit du scénario unitaire](screenshots/rerun/individual_run_1/requests_per_second.png)
 
-![Débit du scénario unitaire](screenshots/individual_run_3/requests_per_second.png)
+**Figure 7 —** Débit servi du run unitaire représentatif. Le profil monte jusqu’à 6 000 req/s demandées, mais le débit effectivement atteint dépend du protocole.
 
-**Figure 7 —** Débit de requêtes du run individuel représentatif. REST atteint le débit de requêtes le plus élevé dans la phase stable visible.
+![CPU du scénario unitaire](screenshots/rerun/individual_run_1/cpu_usage.png)
 
-![CPU du scénario unitaire](screenshots/individual_run_3/cpu_usage.png)
+**Figure 8 —** Utilisation CPU du run unitaire représentatif. Les quatre serveurs atteignent progressivement la limite d’environ `0,25` vCPU.
 
-**Figure 8 —** Utilisation CPU du run individuel représentatif. Les quatre services atteignent la zone de la limite `0,25` vCPU.
+![Itérations abandonnées du scénario unitaire](screenshots/rerun/individual_run_1/dropped_iterations_per_second.png)
 
-### 9.3. Stabilité agrégée des répétitions par lots
+**Figure 9 —** Itérations unitaires non démarrées. Leur apparition suit la saturation; GraphQL et gRPC atteignent leur capacité plus tôt que JSON-RPC et REST.
 
-Comme le tableau précédent, celui-ci ne constitue pas un classement des protocoles. Il décrit la variabilité globale des cinq runs batch et confirme que la charge demandée a produit une saturation soutenue. La comparaison REST/GraphQL/JSON-RPC/gRPC repose sur les séries Grafana présentées ensuite.
+### 9.3. Scénario batch : gRPC atteint le plafond de charge
 
-| Métrique agrégée k6 | Moyenne des 5 runs | Minimum | Maximum |
-| --- | ---: | ---: | ---: |
-| Durée moyenne (`batch_protocol_request_duration`) | 2 915,3 ms | 2 640,7 ms | 3 188,8 ms |
-| Médiane | 382,4 ms | 317 ms | 487 ms |
-| p90 | 10 177,6 ms | 9 760 ms | 10 698 ms |
-| p95 | 11 552,9 ms | 10 539 ms | 12 900,3 ms |
-| Itérations exécutées | 436 505 | 416 151 | 454 513 |
-| Itérations abandonnées | 199 430 | 181 385 | 219 804 |
+| Protocole | Débit moyen (req/s) | Pic moyen (req/s) | Débit utile moyen (ticks/s) | Pic moyen (ticks/s) | CV du débit |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| gRPC | 368,9 | 503,6 | 184 455 | 251 797 | 0,2 % |
+| REST | 328,1 | 447,8 | 164 073 | 223 895 | 3,1 % |
+| JSON-RPC | 209,0 | 272,3 | 104 489 | 136 146 | 3,6 % |
+| GraphQL | 88,5 | 120,5 | 44 244 | 60 239 | 4,0 % |
 
-Les cinq runs batch montrent la même séparation par protocole dans les captures : gRPC atteint environ 250 000 ticks/s, REST environ 200 000 à 245 000 ticks/s, JSON-RPC environ 100 000 à 150 000 ticks/s et GraphQL environ 30 000 à 65 000 ticks/s selon la phase stable et le run. Le classement est nettement plus marqué que dans le scénario unitaire. La latence p99 suit le même ordre : gRPC reste proche de 1 ms, REST se situe autour de quelques millisecondes, JSON-RPC autour d’une dizaine de millisecondes et GraphQL autour de 30 à 50 ms.
+| Protocole | p50 moyen | p95 moyen | p99 moyen | Étendue p99 | CV p99 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| gRPC | 13,4 ms | 124,4 ms | 266,2 ms | 161–439 ms | 36,6 % |
+| REST | 786,2 ms | 6 874,2 ms | 7 588,7 ms | 7 121–8 299 ms | 5,9 % |
+| JSON-RPC | 1 441,6 ms | 12 317,6 ms | 13 395,1 ms | 12 382–15 255 ms | 7,8 % |
+| GraphQL | 4 164,2 ms | 34 101,3 ms | 36 423,7 ms | 31 714–39 107 ms | 7,6 % |
 
-Le run batch 2 est utilisé comme représentation, car sa durée agrégée (`2 849,5 ms`) est la plus proche de la médiane des cinq runs. Les captures des runs 1, 3, 4 et 5 sont conservées pour vérifier la répétabilité de la tendance.
+gRPC atteint dans chaque run le plafond demandé de 500 req/s, soit environ 250 000 ticks/s, sans série d’itérations abandonnées. REST, JSON-RPC et GraphQL abandonnent des itérations dans les cinq runs. La p99 gRPC varie davantage en proportion, mais même son maximum de 439 ms reste très inférieur au minimum REST de 7 121 ms. Le run 1 est représentatif (`testid` `20261119-104900-batch-run1`).
 
-![Latence p99 du scénario par lots](screenshots/batch_run_2/latency_p99.png)
+![Latence p99 du scénario par lots](screenshots/rerun/batch_run_1/latency_p99.png)
 
-**Figure 9 —** Latence p99 du run batch représentatif pour des requêtes de 500 ticks. La séparation entre gRPC et les protocoles textuels est nette.
+**Figure 10 —** Latence p99 du run batch représentatif. Les secondes affichées sont l’unité correcte en régime de surcharge; gRPC reste sous la seconde.
 
-![Débit de ticks du scénario par lots](screenshots/batch_run_2/batch_ticks_per_second.png)
+![Débit de ticks du scénario par lots](screenshots/rerun/batch_run_1/ticks_per_second.png)
 
-**Figure 10 —** Débit de ticks du run batch représentatif. gRPC traite le plus grand nombre de ticks par seconde à charge CPU comparable.
+**Figure 11 —** Débit utile du run batch représentatif. gRPC maintient environ 250 000 ticks/s, devant REST, JSON-RPC et GraphQL.
 
-![CPU du scénario par lots](screenshots/batch_run_2/cpu_usage.png)
+![CPU du scénario par lots](screenshots/rerun/batch_run_1/cpu_usage.png)
 
-**Figure 11 —** Utilisation CPU du run batch représentatif. Les quatre serveurs atteignent la zone de 25 %, mais leur travail utile par unité de CPU diffère.
+**Figure 12 —** Utilisation CPU du run batch représentatif. Les variantes textuelles approchent `0,25` vCPU; gRPC atteint la charge maximale avec une consommation stable plutôt autour de `0,20` vCPU.
 
-![Taux d’erreur du scénario par lots](screenshots/batch_run_2/error_rate.png)
+![Itérations abandonnées du scénario par lots](screenshots/rerun/batch_run_1/batch_dropped_iterations_per_second.png)
 
-**Figure 12 —** Taux d’erreur du run batch représentatif. Les quatre séries restent à 0 % pendant la période observée.
+**Figure 13 —** Itérations batch non démarrées. GraphQL, JSON-RPC et REST dépassent leur capacité; l’absence de courbe gRPC confirme qu’il exécute toute la cadence demandée.
 
-### 9.4. Résultats de débit et changement de classement
+### 9.4. Ressources et observabilité croisée
 
-Le résultat le plus important est l’inversion du classement selon le volume de charge utile. Pour un tick unitaire, REST domine les captures de débit et de p99. Pour 500 ticks, gRPC domine nettement le débit de ticks et la latence p99. Les cinq répétitions de chaque scénario reproduisent cette opposition, ce qui réduit la probabilité qu’elle soit due à un seul run aberrant.
+Les serveurs restent largement sous la limite mémoire de 512 MiB : les maxima observés se situent entre 139 et 199 MiB selon le run. Dans le batch représentatif, gRPC utilise aussi moins de mémoire serveur que les variantes textuelles. Le réseau reçoit davantage de données pour REST (environ 16 MiB/s au maximum) que pour gRPC (environ 6,5 MiB/s), ce qui est compatible avec une représentation binaire plus compacte sans constituer une mesure isolée du coût de sérialisation.
 
-Le débit de ticks est la mesure la plus pertinente pour les lots. À 500 ticks par requête, un plateau de 500 requêtes/s correspond théoriquement à 250 000 ticks/s. Les captures montrent que gRPC approche ce plafond, tandis que les autres protocoles plafonnent plus bas. Les itérations abandonnées montrent que la charge cible dépasse la capacité de l’injecteur ou des serveurs pendant certaines phases; elles ne doivent pas être interprétées comme des réponses applicatives en erreur.
+Le générateur k6 atteint au maximum environ 6,1 cœurs et 9,4 GiB dans le scénario unitaire, puis 8,7 cœurs et 5,8 GiB en batch, sur un hôte de 12 processeurs logiques et 34 GiB. Il exerce donc une pression notable et demeure une ressource partagée. Toutefois, sa capacité à maintenir 500 req/s pour gRPC batch, l’absence d’épuisement mémoire et la saturation visible des serveurs textuels n’indiquent pas que l’injecteur explique à lui seul le classement.
 
-### 9.5. Portée des observations
+### 9.5. Reproduction de l’ancienne campagne
 
-Les résultats établissent une borne expérimentale, et non un seuil continu exact : le classement change entre 1 et 500 ticks par requête. Ils démontrent aussi que les gains de gRPC apparaissent clairement dans le scénario de lots sous contrainte CPU. Ils ne permettent pas de conclure à un seuil universel, ni de séparer parfaitement le coût de chaque couche sans une extraction plus fine des séries Prometheus ou une instrumentation complémentaire.
+La nouvelle campagne reproduit presque exactement le débit global de la campagne archivée : `−0,4 %` en unitaire (10 620,2 contre 10 657,8 req/s) et `−1,6 %` en batch (994,5 contre 1 010,6 req/s). La durée moyenne agrégée passe de 567,1 à 558,6 ms en unitaire (`−1,5 %`) et de 2 915,3 à 3 075,7 ms en batch (`+5,5 %`). Les formes temporelles et les classements sont donc reproduits.
+
+La différence majeure concerne l’affichage des unités : les anciennes captures étiquetaient comme millisecondes des tendances Prometheus stockées en secondes. Par exemple, un plateau GraphQL batch proche de `31` représentait environ 31 secondes, et non 31 ms. Cette erreur de métadonnée n’altérait pas l’ordre relatif, mais invalidait l’interprétation absolue. La campagne officielle corrige l’unité et fournit les percentiles exacts par protocole dans les résumés k6.
+
+### 9.6. Portée des observations
+
+Les résultats établissent une borne expérimentale, et non un seuil continu : le classement change entre 1 et 500 ticks par requête. Ils ne démontrent pas que Protocol Buffers est l’unique cause de l’écart, puisque les bibliothèques et les transports diffèrent aussi. Ils soutiennent néanmoins une décision conditionnelle avec des écarts répétés, une télémétrie convergente et des sources numériques auditables.
 
 ## 10. Analyse des résultats
 
 ### 10.1. Réponse à la question de recherche
 
-La question principale demandait à partir de quel volume de charge utile les gains d’efficacité mécanique de gRPC justifient son coût supplémentaire en opérabilité et en couplage contractuel. Les données ne permettent pas d’identifier un seuil continu exact, puisque seuls deux volumes ont été testés : un tick et un lot de 500 ticks. Elles permettent toutefois d’établir une borne et une inversion de classement clairement répétée.
+La question principale demandait dans quelles conditions de volume de charge utile les gains d’efficacité mécanique de gRPC deviennent suffisants pour justifier son coût supplémentaire en opérabilité et en couplage contractuel. Les données ne permettent pas d’identifier un seuil continu exact, puisque seuls deux volumes ont été testés : un tick et un lot de 500 ticks. Elles permettent toutefois d’établir une borne et une inversion de classement clairement répétée.
 
-Pour un tick unitaire, REST constitue la meilleure décision de performance dans l’environnement étudié. Les cinq captures du scénario unitaire montrent que REST conserve le meilleur débit de requêtes et la latence p99 la plus basse dans la phase soutenue. L’avantage attendu de la représentation binaire ne compense donc pas, pour ce micro-message, les coûts fixes associés à la pile gRPC et à son transport. Cette conclusion est locale au scénario : elle ne signifie pas que REST est toujours plus rapide que gRPC.
+Pour un tick unitaire, REST constitue la meilleure décision de performance dans l’environnement étudié : 3 163,5 req/s en moyenne et une p99 moyenne de 1 024,8 ms, devant JSON-RPC. GraphQL et gRPC plafonnent autour de 2 200 req/s avec des p99 supérieures à trois secondes. L’avantage attendu de la représentation binaire ne compense donc pas, pour ce micro-message, les coûts fixes associés à la pile gRPC et à son transport. Cette conclusion est locale au scénario : elle ne signifie pas que REST est toujours plus rapide que gRPC.
 
-Pour un lot de 500 ticks, gRPC devient la meilleure décision de performance. Les cinq répétitions montrent un débit d’environ 250 000 ticks/s et une latence p99 proche du bas de l’échelle, alors que les variantes textuelles traitent moins de ticks et présentent une queue de latence plus élevée. Dans ce régime, le volume de données par requête rend l’efficacité de la représentation binaire suffisamment importante pour compenser le coût opérationnel supplémentaire, à condition que la performance et l’efficacité CPU soient prioritaires.
+Pour un lot de 500 ticks, gRPC devient la meilleure décision de performance. Il atteint le plafond d’environ 250 000 ticks/s et conserve une p99 moyenne de 266,2 ms; REST, JSON-RPC et GraphQL atteignent respectivement 223 895, 136 146 et 60 239 ticks/s en pointe, avec des p99 moyennes de 7,6, 13,4 et 36,4 secondes. Par rapport à REST, son concurrent le plus proche, gRPC fournit environ 12,4 % de débit utile moyen supplémentaire et une p99 moyenne environ 28,5 fois plus faible. Dans ce régime, le volume de données par requête rend l’efficacité de la représentation binaire suffisamment importante pour compenser le coût opérationnel supplémentaire, à condition que la performance et l’efficacité CPU soient prioritaires.
 
 La conclusion défendable est donc conditionnelle : **gRPC est justifiable lorsque la charge utile est suffisamment importante pour rendre le coût de parsing textuel déterminant; pour les micro-messages, REST demeure préférable lorsque la simplicité et l’opérabilité ont une valeur supérieure au gain mécanique potentiel.** Avec les données disponibles, le point de bascule est encadré entre 1 et 500 ticks par requête, mais il n’est pas localisé à l’intérieur de cet intervalle.
 
@@ -512,7 +555,7 @@ La traçabilité de cette conclusion est représentée dans [`docs/figures/evide
 
 ![Traçabilité des preuves vers la décision](figures/evidence-traceability.png)
 
-**Figure 13 —** Traçabilité entre la question architecturale, les mesures k6 et Prometheus/Grafana, les observations, puis les ADRs et la décision finale. Cette figure montre que la conclusion ne repose pas sur une préférence technologique isolée : elle relie explicitement la question, les données, les observations et la décision.
+**Figure 14 —** Traçabilité entre la question architecturale, les mesures k6 et Prometheus/Grafana, les observations, puis les ADRs et la décision finale. Cette figure montre que la conclusion ne repose pas sur une préférence technologique isolée : elle relie explicitement la question, les données, les observations et la décision.
 
 ### 10.2. Analyse de l’effet de la taille du payload
 
@@ -522,9 +565,9 @@ Dans le scénario batch, ces coûts fixes sont amortis sur 500 objets. Le serveu
 
 ### 10.3. Analyse de la contrainte CPU
 
-Les captures CPU montrent que les quatre services atteignent la zone correspondant à leur limite de `0,25` vCPU. Cette saturation est importante pour interpréter les résultats : elle indique que le système n’est pas évalué dans une zone où toutes les variantes disposent de capacité de calcul inutilisée. Les différences de débit utile apparaissent alors malgré une enveloppe CPU identique.
+Dans le scénario unitaire, les quatre services atteignent la zone correspondant à leur limite de `0,25` vCPU. En batch, GraphQL, JSON-RPC et REST approchent également cette limite, tandis que gRPC maintient la cadence maximale avec une utilisation plutôt autour de `0,20` vCPU. Le dispositif ne compare donc pas seulement quatre services tous bloqués au même plafond : il montre aussi que gRPC conserve une marge dans le scénario où les protocoles textuels saturent.
 
-Dans le scénario batch, gRPC traite davantage de ticks avant ou pendant la saturation observée. Cela signifie que son avantage porte surtout sur l’efficacité du travail accompli par unité de ressource, et non sur une consommation CPU absolue plus faible dans toutes les phases. Les quatre conteneurs peuvent atteindre le même plafond tout en produisant des débits différents. L’affirmation défendable est donc : **gRPC offre le meilleur rendement de la capacité CPU dans le scénario de lots étudié**, et non : **gRPC consomme toujours moins de CPU**.
+L’affirmation défendable est donc : **gRPC offre le meilleur rendement de la capacité CPU dans le scénario de lots étudié**. Elle ne doit pas devenir « gRPC consomme toujours moins de CPU » : dans le scénario unitaire, gRPC atteint lui aussi la limite et obtient un résultat inférieur à REST.
 
 ### 10.4. Analyse des protocoles textuels
 
@@ -540,16 +583,16 @@ GraphQL obtient les résultats les moins favorables dans le scénario batch. La 
 | --- | --- | --- |
 | H1 — coût des micro-messages | Soutenue dans le scénario étudié | REST domine les captures unitaires malgré l’absence de sérialisation binaire |
 | H2 — effet de la taille | Soutenue | Le classement s’inverse pour les lots de 500 ticks et gRPC domine le débit de ticks |
-| H3 — saturation | Soutenue avec réserve | Les conteneurs atteignent la limite CPU et les percentiles élevés se dégradent; la causalité précise n’est pas isolée |
+| H3 — saturation | Soutenue avec réserve | Les serveurs textuels saturent en batch et les percentiles se dégradent; gRPC atteint la cible avec une marge CPU, mais la causalité précise n’est pas isolée |
 | H4 — compromis architectural | Soutenue | gRPC gagne en performance batch, mais la décision dépend de la valeur accordée à l’opérabilité et au couplage |
 
 Les hypothèses sont donc confirmées dans les conditions du benchmark, mais aucune ne doit être reformulée comme une loi générale. Les cinq répétitions renforcent la stabilité de la tendance; elles ne suppriment pas les menaces liées à l’environnement, à l’implémentation et aux deux seules tailles de payload.
 
 ### 10.6. Signification des itérations abandonnées
 
-Les itérations abandonnées sont élevées dans les deux scénarios, particulièrement lorsque la charge demandée dépasse la capacité combinée du générateur et des services. Elles indiquent que k6 n’a pas pu démarrer toutes les itérations prévues avec les VUs disponibles. Elles ne constituent pas des réponses HTTP ou gRPC en échec : les checks applicatifs restent à zéro échec et les taux d’erreur restent nuls.
+Les itérations abandonnées atteignent en moyenne 16,72 % en unitaire et 32,60 % en batch. Elles indiquent que k6 n’a pas pu démarrer toutes les itérations prévues avec les VUs disponibles. Elles ne constituent pas des réponses HTTP ou gRPC en échec : les checks applicatifs restent à zéro échec et les taux d’erreur restent nuls. En batch, les séries d’abandon concernent GraphQL, JSON-RPC et REST dans les cinq runs; gRPC exécute toute la cadence demandée.
 
-Cette distinction est essentielle. Les résultats répondent à une question de capacité sous charge, et la saturation de la charge fait partie du phénomène observé. En revanche, les itérations abandonnées empêchent d’interpréter le débit demandé comme un débit effectivement servi par tous les protocoles. Le rapport doit donc privilégier le débit observé, les séries Grafana et les checks réussis, tout en rapportant les itérations abandonnées comme une limite du dispositif de génération.
+Cette distinction est essentielle. Les résultats répondent à une question de capacité sous charge, et la saturation fait partie du phénomène observé. Les itérations abandonnées empêchent toutefois d’interpréter la cible comme un débit effectivement servi. Les p95 et p99 de plusieurs secondes décrivent ce régime de surcharge et ne doivent pas être présentées comme des SLO acceptables en production.
 
 ### 10.7. Compromis décisionnel résultant des données
 
@@ -629,7 +672,7 @@ Le point de bascule doit donc être défini comme une décision économique et o
 
 Une équipe devrait commencer par caractériser le scénario réel : taille et fréquence des messages, criticité de la latence, nombre de consommateurs, fréquence des changements de contrat et capacité des équipes à exploiter des outils spécialisés. Elle devrait ensuite reproduire une mesure représentative, car les résultats de ce projet ne remplacent pas une mesure dans le contexte cible.
 
-L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml) et présenté en Figure 14. Il formalise les règles suivantes :
+L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures/decision-tradeoffs.puml`](figures/decision-tradeoffs.puml) et présenté en Figure 15. Il formalise les règles suivantes :
 
 1. pour un payload petit et une forte priorité donnée à la lisibilité, commencer par REST;
 2. pour un appel de procédure textuel et inspectable, considérer JSON-RPC;
@@ -639,7 +682,7 @@ L’arbre de décision PlantUML correspondant est disponible dans [`docs/figures
 
 ![Arbre de décision architectural](figures/decision-tradeoffs.png)
 
-**Figure 14 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
+**Figure 15 —** Règle de décision qualitative dérivée des résultats. Elle ne remplace pas une mesure dans le contexte cible et ne transforme pas le benchmark en seuil universel.
 
 ### 11.8. Limite de cette analyse
 
@@ -657,13 +700,13 @@ La validité interne concerne la possibilité d’attribuer les différences obs
 
 **Différences d’implémentation.** Les quatre variantes utilisent le même langage, le même modèle de données et un traitement métier minimal, mais elles n’utilisent pas exactement la même bibliothèque ni exactement le même chemin d’exécution. Axum, async-graphql, jsonrpsee et tonic ont chacun leurs propres mécanismes internes. Les résultats portent donc sur la combinaison protocole, bibliothèque et configuration testée, et non sur une implémentation abstraite de chaque standard.
 
-**Contamination entre exécutions.** Les services sont séparés dans des conteneurs, et l’environnement est redémarré entre les runs. Cela réduit la contamination par l’état des processus, mais ne supprime pas les effets de l’hôte, du système de fichiers, du cache, de la température ou des autres processus Windows. Les cinq répétitions permettent d’observer la variabilité résiduelle sans l’éliminer.
+**Contamination entre exécutions.** Les services sont séparés et les quatre processus serveurs sont redémarrés avant chaque run. Prometheus et Grafana restent actifs pour conserver les séries, isolées par `testid`. Cela réduit la contamination par l’état applicatif, mais ne supprime pas les effets du cache Docker, de la température ou des autres processus Windows. L’alternance unitaire/batch et les cinq répétitions répartissent cette variabilité sans l’éliminer.
 
-**Générateur de charge partagé.** Les quatre scénarios sont exécutés simultanément par k6. Cette décision garantit une pression temporelle comparable, mais elle crée une ressource partagée : CPU, mémoire, connexions et VUs du générateur. Les itérations abandonnées montrent que k6 n’a pas pu lancer toute la charge demandée. Elles doivent donc être rapportées comme une limite de capacité du dispositif et non attribuées automatiquement à un serveur particulier.
+**Générateur de charge partagé.** Les quatre scénarios sont exécutés simultanément par k6. Cette décision garantit une pression temporelle comparable, mais elle crée une ressource partagée : CPU, mémoire, connexions et VUs. k6 atteint jusqu’à 6,1 cœurs et 9,4 GiB en unitaire, puis 8,7 cœurs et 5,8 GiB en batch. Ces valeurs restent sous les 12 processeurs logiques et 34 GiB de l’hôte, et gRPC batch maintient toute la cible, mais l’injecteur ne peut pas être considéré comme parfaitement neutre.
 
 **Ordre et concurrence des scénarios.** Les protocoles sont sollicités dans une même exécution, mais les variations de planification peuvent ne pas être parfaitement identiques entre les séries temporelles. Une étude complémentaire pourrait exécuter chaque protocole séparément avec exactement le même profil, au prix d’une comparabilité temporelle moins directe. La présente étude limite ce risque par cinq répétitions et par l’utilisation d’une configuration identique.
 
-**Saturation réseau ou CPU.** La limite de `0,25` vCPU vise à faire apparaître la contrainte de calcul, mais l’environnement Windows/WSL2/Hyper-V peut aussi introduire un plafond réseau. Les métriques CPU et les captures Grafana montrent que les conteneurs atteignent leur limite, ce qui soutient l’interprétation computationnelle; elles ne prouvent toutefois pas que le réseau n’a jamais contribué à la latence.
+**Saturation réseau ou CPU.** La limite de `0,25` vCPU vise à faire apparaître la contrainte de calcul, mais Windows/WSL2/Hyper-V peut aussi introduire un plafond réseau. Les quatre serveurs saturent en unitaire; les variantes textuelles saturent en batch alors que gRPC atteint la cible autour de `0,20` vCPU. Cette convergence CPU/débit soutient l’interprétation computationnelle sans prouver que le réseau n’a jamais contribué.
 
 ### 12.2. Validité de construit
 
@@ -677,7 +720,7 @@ La validité de construit concerne la correspondance entre les concepts étudié
 
 **Couplage et modifiabilité.** Le fichier `.proto`, le schéma GraphQL, les méthodes JSON-RPC et les conventions REST matérialisent différents types de contrat. Toutefois, le benchmark ne mesure ni le nombre de changements requis pour faire évoluer ces contrats ni le délai de coordination entre équipes. La comparaison décrit un risque architectural plausible, pas un coût organisationnel universel.
 
-**Métriques par protocole.** Les fichiers JSON exportés par k6 agrègent certaines métriques personnalisées sur les quatre tags `protocol`. Les classements par protocole reposent donc sur les séries Grafana et leurs captures, dont les valeurs sont lues à l’échelle des graphiques. Cette limite interdit de présenter ces lectures comme des mesures numériques aussi précises que les valeurs agrégées du JSON.
+**Métriques et unités.** Les seuils tagués conservent désormais les p50, p95, p99, compteurs et erreurs séparément pour les quatre protocoles dans chaque résumé k6. Les exports Prometheus fournissent les séries temporelles correspondantes. Le risque principal était l’unité : k6 résume en millisecondes, tandis que Prometheus stocke les tendances temporelles en secondes. Un test synthétique, des dashboards corrigés et une unité explicite dans les exports réduisent ce risque de construit.
 
 ### 12.3. Validité externe
 
@@ -695,17 +738,17 @@ La validité externe concerne la transférabilité des résultats à d’autres 
 
 ### 12.4. Validité des conclusions
 
-Les cinq répétitions par scénario renforcent la crédibilité de la tendance, mais elles ne constituent pas une preuve de significativité statistique générale. Le rapport ne calcule pas d’intervalle de confiance par protocole et ne réalise pas de test statistique entre distributions. Les termes « nettement », « domine » ou « meilleure » doivent donc être compris dans le domaine expérimental défini par les captures et les scénarios, et non comme des affirmations universelles.
+Les cinq répétitions par scénario renforcent la crédibilité de la tendance, mais elles ne constituent pas une preuve de significativité statistique générale. Le CV du débit reste entre 0,2 et 4,0 %, ce qui soutient la répétabilité. La p99 gRPC batch varie davantage (161 à 439 ms), mais son pire run reste très éloigné du meilleur run REST (7 121 ms). Aucun intervalle de confiance ni test statistique n’est calculé; les termes « domine » ou « meilleure » restent limités au domaine expérimental.
 
 La métrique agrégée contient aussi des itérations abandonnées. Une itération abandonnée signifie que k6 n’a pas démarré le travail prévu; elle ne représente pas nécessairement une réponse reçue en erreur. Les conclusions de performance privilégient donc les requêtes effectivement observées, les checks applicatifs et les séries temporelles, tout en rapportant la pression exercée sur l’injecteur.
 
-Enfin, les captures Grafana sont représentatives, mais elles ne remplacent pas les données sources. Leur fonction est de montrer le comportement temporel et la saturation; les JSON servent à vérifier les compteurs et la stabilité inter-runs. Cette complémentarité doit être conservée dans la version finale du rapport.
+Enfin, les captures Grafana sont représentatives, mais elles ne remplacent pas les données sources. Leur fonction est de montrer le comportement temporel; les résumés k6, exports Prometheus, CSV consolidés et manifestes soutiennent les valeurs quantitatives. Cette distinction empêche qu’un choix de plage ou d’unité d’affichage devienne la seule preuve.
 
 ### 12.5. Limites de mesure et de reproductibilité
 
-La reproductibilité logicielle est bien soutenue par le dépôt : code, Docker Compose, scripts k6, contrat Protocol Buffers, dashboards, JSON et captures sont conservés. La reproductibilité exacte des temps de réponse reste toutefois conditionnée par l’hôte, la version de Docker, la virtualisation et les conditions de charge. Une personne extérieure peut reproduire le protocole et comparer les tendances, mais elle ne doit pas s’attendre à retrouver chaque valeur au milliseconde près.
+La reproductibilité logicielle est soutenue par le code, Docker Compose, les scripts d’orchestration et d’analyse, le contrat Protocol Buffers, les dashboards, les dix triplets d’artefacts et les captures. Les images Docker sont figées par digest. Une personne extérieure peut exécuter le pilote puis la campagne avec les commandes du README, mais les valeurs exactes restent conditionnées par l’hôte et la virtualisation.
 
-Les timestamps des captures, la configuration de l’hôte et les versions exactes des images Docker devraient être archivés avec la remise finale si ces informations sont disponibles. Cette documentation réduirait encore l’ambiguïté sur les conditions d’exécution.
+Les manifestes archivent les heures UTC, le commit Git, l’état du dépôt, Docker `28.0.4`, le système, le CPU, le nombre de processeurs logiques et la mémoire. Ils ne consignent pas la température, la fréquence dynamique du processeur, la configuration interne de Docker Desktop ni toutes les charges Windows; ces variables demeurent résiduelles.
 
 ### 12.6. Effet des limites sur la conclusion
 
@@ -786,9 +829,9 @@ La bonne pratique consiste à transférer la méthode de raisonnement plutôt qu
 
 Cette étude montre que le choix d’un protocole de communication est une décision conditionnelle à la charge de travail. Il n’existe pas, dans le contexte étudié, de protocole dominant simultanément pour les micro-messages et pour les lots volumineux.
 
-Pour l’ingestion d’un tick par requête, REST obtient le meilleur comportement observé en matière de débit de requêtes et de latence de queue. Sa simplicité de transport et son opérabilité plus immédiate sont cohérentes avec un scénario où le contenu du message est faible et où le coût fixe de la pile de communication représente une part importante du travail total.
+Pour l’ingestion d’un tick par requête, REST obtient le meilleur comportement observé : environ 3 164 req/s en moyenne, un pic moyen de 5 551 req/s et une p99 moyenne de 1,025 s. Sa simplicité de transport et son opérabilité plus immédiate sont cohérentes avec un scénario où le contenu du message est faible et où le coût fixe de la pile de communication représente une part importante du travail total.
 
-Pour l’ingestion de lots de 500 ticks, gRPC obtient le meilleur débit de ticks et la meilleure latence p99 observée. Sous la limite commune de `0,25` vCPU, son efficacité devient suffisamment importante pour dépasser les alternatives textuelles. GraphQL présente le coût le plus élevé dans ce scénario, tandis que JSON-RPC conserve une position intermédiaire.
+Pour l’ingestion de lots de 500 ticks, gRPC atteint environ 251 800 ticks/s en pointe et une p99 moyenne de 266 ms. Sous la limite commune de `0,25` vCPU, il atteint toute la charge sans itération abandonnée et conserve une marge CPU, alors que les variantes textuelles saturent. GraphQL présente le coût le plus élevé dans ce scénario, tandis que JSON-RPC conserve une position intermédiaire.
 
 La conclusion ne doit toutefois pas être formulée comme « gRPC est meilleur que REST ». La conclusion défendable est plutôt : **REST est préférable dans le scénario de micro-messages observé, tandis que gRPC est préférable pour les lots volumineux et répétitifs lorsque la performance CPU est prioritaire et que l’organisation peut absorber son coût opérationnel.**
 
@@ -799,10 +842,11 @@ La conclusion repose sur plusieurs éléments convergents :
 - cinq répétitions du scénario unitaire et cinq répétitions du scénario batch;
 - zéro échec dans les checks REST, GraphQL, JSON-RPC et gRPC;
 - un taux d’erreur applicatif nul dans les runs conservés;
-- une saturation répétée des conteneurs autour de la limite de `0,25` vCPU;
+- une saturation répétée des quatre serveurs en unitaire et des variantes textuelles en batch;
 - une inversion du classement entre le scénario d’un tick et celui de 500 ticks;
+- un CV de débit compris entre 0,2 et 4,0 % selon le protocole et le scénario;
 - des captures Grafana montrant la stabilité temporelle des tendances;
-- des fichiers JSON conservant les compteurs, les durées agrégées et les itérations abandonnées;
+- dix résumés k6, dix exports Prometheus, dix manifestes et un rapport de validation à 75/75;
 - une implémentation, une configuration Docker et un protocole d’expérience versionnés dans le dépôt.
 
 Les données encadrent le point de bascule entre 1 et 500 ticks par requête. Elles ne localisent pas le seuil exact à l’intérieur de cet intervalle et ne mesurent pas directement le coût d’opérabilité, de diagnostic ou de gouvernance des contrats. Ces limites font partie de la conclusion plutôt que de l’annuler.
@@ -817,7 +861,7 @@ La démarche recommandée est donc de caractériser la charge critique, d’éta
 
 La réponse finale à la question de recherche est la suivante : dans l’environnement et les scénarios étudiés, le gain mécanique de gRPC ne justifie pas son coût supplémentaire pour le micro-message unitaire; il devient défendable pour un lot de 500 ticks sous contrainte CPU, car le gain de débit et de latence est alors nettement visible. Le seuil précis reste à mesurer avec des tailles intermédiaires, par exemple 10, 50, 100 et 250 ticks, si une localisation plus fine est nécessaire.
 
-Une étude future pourrait également extraire directement les séries Prometheus par protocole, mesurer séparément les étapes de parsing et de désérialisation, comparer plusieurs environnements matériels et évaluer l’opérabilité au moyen de scénarios de diagnostic et d’évolution de contrats. Ces extensions renforceraient la portée des résultats, mais elles ne sont pas nécessaires pour soutenir la conclusion conditionnelle du présent rapport.
+Une étude future pourrait mesurer des tailles intermédiaires, séparer par profilage les étapes de parsing et de désérialisation, exécuter chaque protocole isolément, comparer plusieurs environnements matériels et évaluer l’opérabilité au moyen de scénarios de diagnostic et d’évolution de contrats. Ces extensions renforceraient la portée des résultats, mais elles ne sont pas nécessaires pour soutenir la conclusion conditionnelle du présent rapport.
 
 ## Déclaration d’utilisation de l’IA
 
