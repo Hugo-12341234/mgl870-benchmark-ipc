@@ -110,3 +110,52 @@ async fn handle_batch_request(request: JsonRpcRequest) -> (StatusCode, Json<Valu
     };
     (StatusCode::OK, Json(json!(response)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{JsonRpcRequest, jsonrpc_handler};
+    use axum::{Json, http::StatusCode};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn accepts_single_and_batch_requests() {
+        let tick = json!({
+            "symbol": "SHOP",
+            "price": 115.42,
+            "volume": 100,
+            "timestamp": 1_700_000_000_u64
+        });
+
+        for (method, params) in [
+            ("ingest_tick", tick.clone()),
+            ("ingest_tick_batch", json!([tick])),
+        ] {
+            let request = JsonRpcRequest {
+                jsonrpc: "2.0".to_owned(),
+                method: method.to_owned(),
+                params: Some(params),
+                id: Some(json!(1)),
+            };
+            let (status, Json(body)) = jsonrpc_handler(Json(request)).await;
+
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(body["jsonrpc"], "2.0");
+            assert_eq!(body["result"], true);
+            assert_eq!(body["id"], 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_an_unknown_method() {
+        let request = JsonRpcRequest {
+            jsonrpc: "2.0".to_owned(),
+            method: "unknown".to_owned(),
+            params: Some(json!({})),
+            id: Some(json!(1)),
+        };
+        let (status, Json(body)) = jsonrpc_handler(Json(request)).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["error"], "invalid request");
+    }
+}

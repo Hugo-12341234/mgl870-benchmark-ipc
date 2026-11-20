@@ -1,4 +1,4 @@
-@startuml "MGL870 - Packages Rust"
+@startuml
 !theme plain
 skinparam backgroundColor #FFFFFF
 skinparam componentStyle uml2
@@ -22,25 +22,27 @@ package "mgl870-benchmark-ipc" {
   }
   package "graphql" #E6F7FF {
     [Schema et mutations\nasync-graphql] as Graphql
+    [TickInput\ntype GraphQL] as GraphqlInput
   }
   package "jsonrpc" #E6F7FF {
     [Handler RPC\njsonrpsee + serde_json] as JsonRpc
   }
   package "grpc" #E6F7FF {
     [Service RPC\ntonic + prost] as Grpc
+    [TickMessage / TickList\ntypes générés] as GrpcTypes
     artifact "proto/tick.proto" as Proto
   }
 }
 
-Main --> Rest : merge router
-Main --> Graphql : merge router
-Main --> JsonRpc : merge router
-Main --> Grpc : tokio::spawn\nport 50051
+Main --> Rest
+Main --> Graphql
+Main --> JsonRpc
+Main --> Grpc
 Rest --> Models : désérialise Tick
-Graphql --> Models : TickInput
 JsonRpc --> Models : désérialise JSON
-Grpc --> Proto : contrat généré
-Grpc --> Models : TickMessage / TickList
+Graphql --> GraphqlInput : utilise
+Proto --> GrpcTypes : tonic-build / prost
+Grpc --> GrpcTypes : utilise
 
 note bottom of Main
 HTTP/1.1 : port 8080
@@ -49,8 +51,8 @@ end note
 
 legend right
 Le même binaire Rust expose les trois routeurs HTTP
-et démarre le service gRPC. Chaque package conserve
-la logique propre à son protocole, tandis que le modèle
-Tick et le contrat proto définissent les données comparées.
+et démarre le service gRPC. REST et JSON-RPC partagent
+le type Tick; GraphQL et gRPC utilisent des types équivalents
+définis par leur schéma ou générés depuis tick.proto.
 end legend
 @enduml

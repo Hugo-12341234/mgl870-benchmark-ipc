@@ -1,2 +1,4 @@
 /target
 /results/pilot_*/
+__pycache__/
+*.py[cod]

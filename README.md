@@ -27,7 +27,14 @@ expérimental documenté.
 Prérequis : Docker Desktop doit être démarré et PowerShell doit pouvoir appeler
 `docker compose`.
 
-Valider d’abord le banc d’essai avec deux pilotes de 30 secondes :
+Valider d’abord les contrats et les comportements fonctionnels des quatre
+interfaces :
+
+```powershell
+cargo test
+```
+
+Valider ensuite le banc d’essai avec deux pilotes de 30 secondes :
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1 -Quick
@@ -60,7 +67,8 @@ La campagne officielle et l’archive historique sont décrites dans
 ## Organisation du dépôt
 
 - `src/` et `proto/` : serveurs Rust et contrat Protocol Buffers;
-- `tests/` : charges k6, orchestration, consolidation et validation;
+- `tests/` et les modules `#[cfg(test)]` de `src/` : charges k6, tests Rust,
+  orchestration, consolidation et validation;
 - `grafana/` et `prometheus.yml` : observabilité reproductible;
 - `results/rerun_20261119-104900/` : données numériques officielles;
 - `docs/screenshots/rerun/` : captures des runs représentatifs;

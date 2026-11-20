@@ -1,8 +1,30 @@
 # Étude comparative du coût architectural des protocoles de communication pour l’ingestion à haute fréquence
 
-**Auteur :** Hugo Vaillant  
-**Cours :** MGL870 — Architecture logicielle  
-**Format :** Article scientifique — Livrable 2  
+**Auteur :** Hugo Vaillant<br>
+**Cours :** MGL870 — Architecture logicielle<br>
+**Format :** Article scientifique — Livrable 2<br>
+
+## Résumé
+
+Le choix d’un protocole de communication interne met en tension la performance, l’efficacité matérielle, l’opérabilité et le couplage des contrats. Cette étude évalue dans quelles conditions l’efficacité mécanique de gRPC justifie son coût architectural supplémentaire par rapport à REST, GraphQL et JSON-RPC. Quatre interfaces équivalentes ont été implémentées dans un même artefact Rust, puis déployées dans des conteneurs isolés limités chacun à `0,25` vCPU. Deux charges ont été comparées : un tick de marché par requête et un lot de 500 ticks. La campagne officielle comprend cinq répétitions de chaque scénario, des mesures k6 et Prometheus, une télémétrie des ressources et 75 contrôles automatisés de cohérence. Pour les micro-messages, REST présente le meilleur comportement observé, avec 3 163,5 req/s et une p99 moyenne de 1 024,8 ms. Pour les lots, gRPC atteint environ 251 800 ticks/s en pointe, une p99 moyenne de 266,2 ms et toute la cadence demandée sans itération abandonnée. L’étude met ainsi en évidence une inversion de classement plutôt qu’un protocole universellement supérieur. Dans le contexte évalué, gRPC devient défendable lorsque la charge utile rend ses gains de débit, de latence et d’efficacité CPU suffisamment importants pour compenser un outillage plus spécialisé et un contrat plus couplé. Le résultat transférable est une règle de décision conditionnelle, soutenue par un protocole reproductible et explicitement limitée aux implémentations, charges et ressources étudiées.
+
+## Sommaire
+
+1. [Introduction](#1-introduction)
+2. [Contexte et motivation](#2-contexte-et-motivation)
+3. [Problème architectural](#3-problème-architectural)
+4. [Questions de recherche et objectifs](#4-questions-de-recherche-et-objectifs)
+5. [Travaux connexes et état de l’art](#5-travaux-connexes-et-état-de-lart)
+6. [Système et contexte étudiés](#6-système-et-contexte-étudiés)
+7. [Architecture et décisions](#7-architecture-et-décisions)
+8. [Méthodologie](#8-méthodologie)
+9. [Résultats](#9-résultats)
+10. [Analyse des résultats](#10-analyse-des-résultats)
+11. [Compromis architecturaux](#11-compromis-architecturaux)
+12. [Menaces à la validité et limites](#12-menaces-à-la-validité-et-limites)
+13. [Implications pour les architectes logiciels](#13-implications-pour-les-architectes-logiciels)
+14. [Conclusion](#14-conclusion)
+15. [Références](#15-références)
 
 ## 1. Introduction
 
@@ -14,7 +36,7 @@ Ces choix correspondent à des compromis architecturaux différents. Un protocol
 
 Ce rapport présente une évaluation expérimentale de REST, GraphQL, JSON-RPC et gRPC dans un environnement contrôlé. Les quatre interfaces sont implémentées dans des micro-serveurs Rust qui réalisent le même traitement minimal : recevoir une structure représentant un tick de marché, la désérialiser en mémoire et retourner un accusé de succès. L’expérimentation compare un scénario de micro-message unitaire à un scénario d’ingestion par lots de 500 ticks. Les serveurs sont exécutés dans des conteneurs Docker soumis à une limite de `0,25` vCPU afin de faire apparaître les coûts de traitement des protocoles avant que la capacité de calcul ne soit masquée par une machine surdimensionnée.
 
-Les résultats étudiés mettent en évidence un point de bascule plutôt qu’un classement universel. Pour les messages unitaires, REST obtient les meilleurs résultats dans la configuration observée, ce qui indique que les coûts associés à la pile gRPC et au multiplexage HTTP/2 peuvent dépasser le bénéfice de la sérialisation binaire lorsque le payload est très petit. Pour les lots de 500 ticks, gRPC conserve au contraire une latence et un débit nettement plus favorables que les alternatives textuelles, dont le coût de parsing devient dominant sous contrainte CPU. Cette opposition constitue le résultat architectural central de l’étude : le choix du protocole doit être conditionné par le volume de données par requête, la pression sur le processeur et la valeur accordée à l’opérabilité.
+Les résultats étudiés mettent en évidence un point de bascule plutôt qu’un classement universel. Pour les messages unitaires, REST obtient les meilleurs résultats dans la configuration observée, ce qui indique que les coûts associés à la pile gRPC et au multiplexage HTTP/2 peuvent dépasser le bénéfice de la sérialisation binaire lorsque le payload est très petit. Pour les lots de 500 ticks, gRPC conserve au contraire une latence et un débit nettement plus favorables que les alternatives textuelles. Ce résultat est compatible avec un coût accru de parsing, de sérialisation et d’exécution des piles textuelles sous contrainte CPU, sans isoler expérimentalement la contribution exacte de chaque étape. Cette opposition constitue le résultat architectural central de l’étude : le choix du protocole doit être conditionné par le volume de données par requête, la pression sur le processeur et la valeur accordée à l’opérabilité.
 
 La contribution de ce travail est ainsi double. Premièrement, il fournit des mesures reproductibles sur un système volontairement réduit afin d’isoler le coût mécanique de la communication. Deuxièmement, il transforme ces mesures en une analyse de décision architecturale : quand la simplicité et la lisibilité des protocoles textuels restent-elles préférables, et dans quelles conditions de charge l’efficacité de gRPC justifie-t-elle la complexité supplémentaire de ses contrats et de son outillage? La portée des conclusions demeure liée à l’environnement expérimental et aux scénarios évalués; elles ne prétendent pas établir une supériorité générale d’un protocole.
 
@@ -63,6 +85,20 @@ Dans cette étude, la question est rendue observable par deux scénarios contrô
 
 Le rapport cherchera donc à établir une conclusion conditionnelle : les protocoles textuels peuvent demeurer une décision raisonnable lorsque la simplicité, l’interopérabilité et l’opérabilité dominent et que le volume de données par requête est faible; gRPC peut devenir préférable lorsque la charge utile est suffisamment importante et que la contrainte CPU rend le coût du parsing textuel déterminant. Cette conclusion devra être soutenue par les mesures de latence, de débit et de ressources, puis nuancée par l’analyse des limites et des coûts architecturaux qui ne sont pas entièrement mesurables dans ce benchmark.
 
+### 3.1. Parties prenantes et attributs de qualité
+
+La décision intéresse plusieurs parties prenantes qui n’accordent pas la même priorité aux attributs de qualité. Les scénarios ci-dessous rendent leurs préoccupations explicites et distinguent les propriétés mesurées des propriétés analysées qualitativement.
+
+| Partie prenante | Préoccupation architecturale | Attribut de qualité | Scénario ou preuve retenue |
+| --- | --- | --- | --- |
+| Architecte logiciel | Choisir un protocole adapté au volume de données | Performance et scalabilité | p50, p95, p99, débit et saturation pour 1 et 500 ticks |
+| Équipe SRE / exploitation | Diagnostiquer une saturation et établir des SLO | Observabilité et opérabilité | Métriques k6, Prometheus, Grafana, cAdvisor et itérations abandonnées |
+| Développeurs producteurs et consommateurs | Faire évoluer et intégrer les contrats | Modifiabilité et couplage | Analyse des contrats REST, GraphQL, JSON-RPC et `.proto`; ADRs |
+| Responsable de plateforme | Utiliser efficacement les ressources disponibles | Efficacité matérielle et coût | CPU, mémoire et trafic réseau sous une limite commune de `0,25` vCPU |
+| Responsable du système d’ingestion | Maintenir un service correct sous charge | Fiabilité fonctionnelle | Checks sémantiques, taux d’erreur et tests automatisés des quatre interfaces |
+
+La performance et l’efficacité CPU sont évaluées quantitativement. L’observabilité et la reproductibilité sont soutenues par les artefacts et les contrôles automatisés. L’opérabilité, la modifiabilité et le couplage restent des conséquences architecturales argumentées : le projet ne les présente pas comme des mesures expérimentales équivalentes à la latence ou au débit.
+
 ## 4. Questions de recherche et objectifs
 
 ### 4.1. Question de recherche principale
@@ -108,11 +144,11 @@ La réponse finale sera considérée comme solide seulement si elle distingue le
 
 ### 5.1. Les styles d’interface comparés
 
-REST est étudié ici comme une application du style architectural REST à travers une interface HTTP orientée ressource. Le travail de Fielding sur les styles architecturaux du Web met en avant les contraintes qui favorisent la séparation des responsabilités, la visibilité des interactions et l’évolutivité de systèmes distribués [1] (https://ics.uci.edu/~fielding/pubs/dissertation/top.htm). Dans le benchmark, REST fournit une baseline pragmatique : une requête `POST` transporte un objet JSON vers une ressource d’ingestion et le serveur répond par un statut HTTP. Cette baseline ne représente pas toutes les architectures REST possibles, mais elle fournit une référence textuelle et largement outillée.
+REST est étudié ici comme une application du style architectural REST à travers une interface HTTP orientée ressource. Le travail de Fielding sur les styles architecturaux du Web met en avant les contraintes qui favorisent la séparation des responsabilités, la visibilité des interactions et l’évolutivité de systèmes distribués [1]. Dans le benchmark, REST fournit une baseline pragmatique : une requête `POST` transporte un objet JSON vers une ressource d’ingestion et le serveur répond par un statut HTTP. Cette baseline ne représente pas toutes les architectures REST possibles, mais elle fournit une référence textuelle et largement outillée.
 
-JSON-RPC 2.0 décrit une convention légère d’appel de procédures à distance au moyen d’objets JSON contenant notamment une version, une méthode, des paramètres et un identifiant de corrélation [2] (https://www.jsonrpc.org/specification). Ce modèle réduit l’ambiguïté entre une opération métier et une ressource, tout en conservant les coûts de représentation et d’analyse du JSON. Dans cette étude, JSON-RPC permet donc d’isoler l’effet d’une interface orientée action sans changer de format de sérialisation textuel.
+JSON-RPC 2.0 décrit une convention légère d’appel de procédures à distance au moyen d’objets JSON contenant notamment une version, une méthode, des paramètres et un identifiant de corrélation [2]. Ce modèle réduit l’ambiguïté entre une opération métier et une ressource, tout en conservant les coûts de représentation et d’analyse du JSON. Dans cette étude, JSON-RPC permet donc d’isoler l’effet d’une interface orientée action sans changer de format de sérialisation textuel.
 
-GraphQL définit un langage de requête et un environnement d’exécution permettant au client de demander une forme précise de résultat [3] (https://spec.graphql.org/October2021/). Cette flexibilité peut réduire les échanges inutiles dans des systèmes où les besoins de lecture sont variables. Elle introduit toutefois une étape d’analyse et d’exécution de la requête. Le cas étudié est volontairement plus contrôlé que les usages généraux de GraphQL : chaque scénario utilise une mutation d’ingestion connue à l’avance. Le protocole conserve néanmoins le coût structurel de l’analyse du document GraphQL, ce qui en fait une alternative pertinente pour l’étude du compromis entre flexibilité et coût de traitement.
+GraphQL définit un langage de requête et un environnement d’exécution permettant au client de demander une forme précise de résultat [3]. Cette flexibilité peut réduire les échanges inutiles dans des systèmes où les besoins de lecture sont variables. Elle introduit toutefois une étape d’analyse et d’exécution de la requête. Le cas étudié est volontairement plus contrôlé que les usages généraux de GraphQL : chaque scénario utilise une mutation d’ingestion connue à l’avance. Le protocole conserve néanmoins le coût structurel de l’analyse du document GraphQL, ce qui en fait une alternative pertinente pour l’étude du compromis entre flexibilité et coût de traitement.
 
 gRPC est également une interface orientée appel de procédure, mais elle formalise davantage le contrat entre le client et le serveur. Le service et ses opérations sont décrits explicitement dans un contrat partagé, puis utilisés pour générer les artefacts nécessaires aux clients et aux serveurs [4]. Cette approche peut réduire l’ambiguïté des interfaces et renforcer la vérification des contrats, mais elle augmente aussi la dépendance entre les équipes et l’outillage de génération. Dans le benchmark, gRPC constitue donc l’alternative RPC fortement contractuelle face à JSON-RPC, qui conserve un contrat textuel et une structure de message inspectable directement.
 
@@ -120,17 +156,27 @@ gRPC est également une interface orientée appel de procédure, mais elle forma
 
 Les protocoles textuels utilisés dans l’étude représentent les messages au format JSON. JSON est lisible et facilement pris en charge par de nombreux environnements, mais cette représentation doit être parcourue et convertie en structures natives à chaque requête. Le coût dépend du contenu, de l’implémentation du parseur et de la pression CPU. Il ne peut donc pas être déduit uniquement de la taille théorique du document.
 
-gRPC repose sur des contrats définis avec Protocol Buffers et utilise HTTP/2 pour le transport. La documentation officielle de gRPC décrit les appels RPC, les contrats de service, la génération de code et les mécanismes de communication associés [4](https://grpc.io/docs/what-is-grpc/core-concepts/). La documentation de Protocol Buffers décrit pour sa part une représentation structurée et compacte destinée à être encodée et décodée par des implémentations générées [5](https://protobuf.dev/programming-guides/proto3/). Ces mécanismes rendent plausible un avantage pour les messages volumineux, mais ils ne suppriment pas les coûts fixes du transport, de la gestion des connexions et de la pile d’exécution. C’est précisément pourquoi l’étude oppose des messages unitaires à des lots importants.
+gRPC repose sur des contrats définis avec Protocol Buffers et utilise HTTP/2 pour le transport. La documentation officielle de gRPC décrit les appels RPC, les contrats de service, la génération de code et les mécanismes de communication associés [4]. La documentation de Protocol Buffers décrit pour sa part une représentation structurée et compacte destinée à être encodée et décodée par des implémentations générées [5]. Ces mécanismes rendent plausible un avantage pour les messages volumineux, mais ils ne suppriment pas les coûts fixes du transport, de la gestion des connexions et de la pile d’exécution. C’est précisément pourquoi l’étude oppose des messages unitaires à des lots importants.
 
-Les travaux sur les systèmes de données distribuées rappellent également qu’un compromis de performance ne doit pas être séparé des autres propriétés du système. Kleppmann souligne que les choix de représentation, de transport et d’organisation des données doivent être évalués selon la charge de travail et les exigences du système, plutôt qu’à partir d’une caractéristique isolée [6](https://dataintensive.net/). Cette perspective soutient l’approche retenue ici : la performance est analysée avec la contrainte CPU, la taille des messages et les coûts d’exploitation, et non comme un classement abstrait des technologies.
+Les travaux sur les systèmes de données distribuées rappellent également qu’un compromis de performance ne doit pas être séparé des autres propriétés du système. Kleppmann souligne que les choix de représentation, de transport et d’organisation des données doivent être évalués selon la charge de travail et les exigences du système, plutôt qu’à partir d’une caractéristique isolée [6]. Cette perspective soutient l’approche retenue ici : la performance est analysée avec la contrainte CPU, la taille des messages et les coûts d’exploitation, et non comme un classement abstrait des technologies.
 
-### 5.3. Positionnement de la présente étude
+### 5.3. Études empiriques comparables
+
+Kamiński et al. ont comparé REST, WebSocket, gRPC et GraphQL au moyen de serveurs Python et d’opérations contrôlées de création et de lecture [9]. Leur étude mesure notamment le temps et le volume de données transférées; elle rapporte une forte efficacité de gRPC et un coût plus élevé de GraphQL dans son environnement. Cette convergence avec le classement batch observé ici est utile, mais elle ne permet pas de généraliser le résultat : le langage, les bibliothèques, les opérations et les profils de charge diffèrent.
+
+Bolanowski et al. ont étudié REST et gRPC dans des écosystèmes de microservices et concluent que l’efficacité relative dépend de la classe de tâche de communication [10]. Leur résultat soutient directement l’idée qu’un protocole ne doit pas être choisi à partir d’une réputation générale de performance. La présente étude poursuit ce raisonnement en manipulant explicitement la taille de la charge utile et en reliant le débit et la latence à la saturation CPU.
+
+La comparaison ne doit toutefois pas réduire l’architecture à la seule performance. Brito et Valente ont mené une expérience contrôlée sur l’effort nécessaire pour implémenter des requêtes REST et GraphQL [11]. Leurs résultats montrent que GraphQL peut réduire l’effort pour certaines requêtes complexes grâce à ses abstractions et à son outillage. Cette perspective nuance les résultats du présent benchmark : GraphQL est défavorable pour la mutation répétitive étudiée, mais sa flexibilité peut demeurer utile sur le plan architectural lorsque les besoins de lecture et les formes de réponse varient.
+
+### 5.4. Positionnement de la présente étude
 
 La littérature et la documentation permettent de comprendre les propriétés annoncées des protocoles, mais elles ne suffisent pas à prédire le classement obtenu par quatre implémentations concrètes sous une limite de `0,25` vCPU. Le présent travail complète donc ces sources par une expérience contrôlée. Sa contribution n’est pas de proposer un nouveau protocole ni une nouvelle technique de sérialisation. Elle consiste à examiner une décision architecturale dans un scénario reproductible où la taille du payload et la contrainte de calcul sont explicitement manipulées.
 
+Par rapport aux travaux empiriques recensés, le protocole réunit cinq caractéristiques : un même artefact Rust pour réduire les différences de langage, quatre interfaces comparées simultanément, une limite identique de `0,25` vCPU par serveur, deux tailles de charge utile séparées par un facteur de 500 et cinq répétitions accompagnées d’une télémétrie des ressources. Ce dispositif ne rend pas les résultats universels; il rend plus explicite le domaine dans lequel la décision est défendable.
+
 Le benchmark se distingue également d’une comparaison fonctionnelle. Les interfaces ne sont pas évaluées selon le nombre de fonctionnalités proposées, la richesse de l’écosystème ou la popularité de leur communauté. Elles sont comparées selon des scénarios d’ingestion et des attributs de qualité mesurables. Les propriétés de flexibilité, d’opérabilité et de couplage sont utilisées pour interpréter les conséquences architecturales des résultats, mais elles ne sont pas présentées comme des mesures quantitatives équivalentes à la latence ou au débit.
 
-Les sources citées dans cette section seront reprises et complétées dans la section 15, qui constituera la bibliographie finale du rapport.
+Les sources citées dans cette section sont regroupées dans la bibliographie finale à la section 15.
 
 ## 6. Système et contexte étudiés
 
@@ -183,11 +229,11 @@ La couche d’observabilité est séparée du chemin fonctionnel évalué. k6 en
 
 Le diagramme de déploiement complet est versionné dans [`docs/figures/architecture.puml`](figures/architecture.puml) et présenté en Figure 1. L’image exportée est la vue de référence du rapport; le fichier PlantUML reste la source modifiable.
 
-Un diagramme de packages complète cette vue de déploiement en décrivant l’organisation interne du binaire Rust. Il montre que `main.rs` assemble les routeurs HTTP, démarre le service gRPC, et que les modules de protocole convergent vers le modèle `Tick` sans partager une logique d’adaptation artificielle. La source est disponible dans [`docs/figures/packages.puml`](figures/packages.puml).
+Un diagramme de packages complète cette vue de déploiement en décrivant l’organisation interne du binaire Rust. Il montre que `main.rs` assemble les routeurs HTTP et démarre le service gRPC. REST et JSON-RPC désérialisent vers le type Rust `Tick`; GraphQL utilise son propre `TickInput`, tandis que gRPC utilise les types générés depuis `tick.proto`. Ces représentations portent les mêmes champs sans introduire une couche d’adaptation artificielle. La source est disponible dans [`docs/figures/packages.puml`](figures/packages.puml).
 
 ![Organisation des packages Rust](figures/packages.png)
 
-**Figure 2 —** Organisation des packages Rust du serveur expérimental. `main.rs` assemble les routeurs HTTP et démarre le service gRPC; les modules de protocole restent séparés et partagent le modèle `Tick` ou le contrat `tick.proto` selon le chemin d’exécution. Cette figure explique la structure logicielle interne qui soutient l’architecture déployée.
+**Figure 2 —** Organisation des packages Rust du serveur expérimental. `main.rs` assemble les routeurs HTTP et démarre le service gRPC; chaque module conserve ses types de frontière, avec un modèle commun à REST et JSON-RPC et des types propres à GraphQL et gRPC. Cette figure explique la structure logicielle interne qui soutient l’architecture déployée.
 
 ### 7.2. Vue des composants logiciels
 
@@ -199,7 +245,7 @@ Le diagramme de composants source est disponible dans [`docs/figures/components.
 
 ![Diagramme de composants du banc d’essai](figures/components.png)
 
-**Figure 3 —** Diagramme de composants du banc d’essai. Les scénarios k6 appellent quatre adaptateurs séparés; ceux-ci convergent vers le modèle `Tick` et le traitement minimal. La chaîne d’observabilité est isolée afin de ne pas confondre le chemin fonctionnel évalué avec la collecte des métriques. Cette figure est l’export du fichier source [`docs/figures/components.puml`](figures/components.puml).
+**Figure 3 —** Diagramme de composants du banc d’essai. Les deux profils alimentent un orchestrateur k6 commun, qui appelle quatre adaptateurs séparés; ceux-ci convergent vers le même contrat conceptuel et le même traitement minimal. La chaîne d’observabilité est isolée afin de ne pas confondre le chemin fonctionnel évalué avec la collecte des métriques. Cette figure est l’export du fichier source [`docs/figures/components.puml`](figures/components.puml).
 
 ### 7.3. Séquence d’une requête
 
@@ -393,9 +439,11 @@ L’étude adopte une comparaison contrôlée à deux facteurs principaux : le p
 
 Deux séries de cinq répétitions ont été réalisées le 19 novembre 2026 : cinq runs unitaires et cinq runs batch, alternés afin de répartir une éventuelle dérive temporelle de l’hôte. La campagne officielle est isolée dans [`results/rerun_20261119-104900/`](../results/rerun_20261119-104900/). Chaque run possède son dossier avec `k6_summary.json`, `prometheus.json` et `manifest.json`. Les captures officielles se trouvent dans [`docs/screenshots/rerun/`](screenshots/rerun/); les données et captures de l’ancienne campagne sont clairement séparées dans leurs répertoires `archive/legacy_pre_validation/` respectifs.
 
+Une couche de validation fonctionnelle précède la mesure de performance. Les tests Rust vérifient la sérialisation du modèle, l’acceptation et le rejet de payloads REST, les mutations GraphQL, les enveloppes JSON-RPC et les deux appels gRPC. Ils ne constituent pas une preuve de performance et n’ont pas servi à produire les résultats historiques; leur rôle est de détecter une régression du contrat avant une nouvelle campagne. Les checks k6 valident ensuite la sémantique des réponses pendant la charge réelle.
+
 Les répétitions servent à mesurer la stabilité des tendances, et non à prétendre à une inférence statistique générale. Les résultats sont synthétisés par moyenne, minimum, maximum et coefficient de variation (CV) entre les runs. Des seuils tagués forcent k6 à conserver les compteurs et percentiles séparément pour chaque protocole; les exports Prometheus fournissent en plus les séries temporelles. Pour chaque workload, le run représentatif est choisi automatiquement comme celui dont la moyenne des quatre p99 est la plus proche de la médiane des cinq moyennes de run.
 
-Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : construction, application des limites, attribution d’un `testid`, redémarrage et vérification des serveurs, exécution des quatre protocoles, export des trois artefacts par run, validation, alternance des scénarios, consolidation des cinq répétitions et sélection déterministe des captures représentatives.
+Le workflow expérimental complet est documenté dans [`docs/figures/experiment-workflow.puml`](figures/experiment-workflow.puml). Il montre la succession des étapes : tests fonctionnels, construction, application des limites, attribution d’un `testid`, redémarrage et vérification des serveurs, exécution des quatre protocoles, export des trois artefacts par run, validation, alternance des scénarios, consolidation des cinq répétitions et sélection déterministe des captures représentatives.
 
 ![Workflow expérimental reproductible](figures/experiment-workflow.png)
 
@@ -425,17 +473,25 @@ Les scripts k6 enregistrent la durée personnalisée (`protocol_request_duration
 
 Les résumés k6 expriment les durées en millisecondes. Le remote write k6 exprime les tendances temporelles en secondes dans Prometheus; les dashboards déclarent donc l’unité `s` et Grafana adapte automatiquement l’échelle en `ms` lorsque nécessaire. Cette convention a été vérifiée par le test synthétique documenté dans [`docs/validation/latency-units.md`](validation/latency-units.md). Chaque `prometheus.json` conserve explicitement `latency_unit: seconds`.
 
-Le p50 décrit le comportement typique, tandis que le p95 et le p99 rendent visibles les files d’attente et la dégradation de la queue de distribution. Pour les lots, le débit de ticks est le débit de requêtes multiplié par 500. Les tableaux utilisent les résumés numériques et les exports Prometheus; les captures servent uniquement à montrer la dynamique temporelle.
+Le p50 décrit le comportement typique, tandis que le p95 et le p99 rendent visibles les files d’attente et la dégradation de la queue de distribution. Pour les lots, le débit de ticks est le débit de requêtes multiplié par 500. Le **débit moyen** provient du compteur k6 divisé par la durée complète du profil, rampes comprises; il ne représente donc pas un plateau stationnaire isolé. Le **débit de pointe** est la valeur maximale du `rate` Prometheus calculé sur une fenêtre glissante d’une minute et échantillonné toutes les cinq secondes. Les tableaux utilisent les résumés numériques et les exports Prometheus; les captures servent uniquement à montrer la dynamique temporelle.
 
 ### 8.6. Critères de validité et reproductibilité
 
 Un run est conservé lorsqu’il est complet, que les quatre checks applicatifs ont zéro échec, que les taux d’erreur sont nuls, que les métriques par protocole sont présentes et que les requêtes Prometheus essentielles contiennent des séries. Les itérations abandonnées ne sont pas des erreurs applicatives : elles indiquent que k6 n’a pas pu démarrer toute la charge demandée avec les VUs disponibles. Les seuils de latence k6 sont des objectifs de saturation et non un filtre d’exclusion.
 
+Les tests unitaires et d’interface s’exécutent avec `cargo test`. Ils couvrent les chemins de succès unitaires et batch des quatre adaptateurs ainsi que des cas de rejet REST, GraphQL, JSON-RPC et de désérialisation. Cette validation complète les checks de campagne sans modifier les mesures déjà produites.
+
 Le validateur [`tests/validate_benchmark_suite.ps1`](../tests/validate_benchmark_suite.ps1) vérifie automatiquement les artefacts, les identités, les checks, les erreurs, la couverture télémétrique, le commit, la version Docker et l’hôte. La campagne officielle passe **75 contrôles sur 75**; le rapport produit se trouve dans [`summary/validation_report.md`](../results/rerun_20261119-104900/summary/validation_report.md).
 
 ### 8.7. Reproductibilité expérimentale
 
-La reproduction complète nécessite Docker Desktop et une seule commande PowerShell lancée à la racine du dépôt :
+La reproduction commence par la validation fonctionnelle du binaire :
+
+```powershell
+cargo test
+```
+
+La campagne complète nécessite ensuite Docker Desktop et une seule commande PowerShell lancée à la racine du dépôt :
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1
@@ -443,7 +499,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1
 
 Le script construit l’environnement, alterne les dix runs, redémarre les serveurs, assigne les `testid`, exporte les données, vérifie chaque exécution et consolide les résultats. Le protocole détaillé, l’arborescence et la stratégie de captures sont décrits dans [`docs/benchmark-rerun.md`](benchmark-rerun.md). Les images Docker sont figées par digest; les manifestes consignent le commit `b94ba5352de06c167473d725d4a64bc6d0368223`, Docker `28.0.4`, Windows 11, le processeur Intel i5-10400, 12 processeurs logiques et 34 005 622 784 octets de mémoire.
 
-La reproductibilité doit être comprise à deux niveaux. Le protocole, les scripts, les limites de ressources et les métriques peuvent être reproduits directement. Les valeurs exactes de latence peuvent varier selon l’hôte, la version de Docker, Windows/WSL2 et la virtualisation; la propriété attendue est donc la reproduction des tendances et du raisonnement, pas l’égalité au milliseconde près.
+La reproductibilité doit être comprise à deux niveaux. Le protocole, les scripts, les limites de ressources et les métriques peuvent être reproduits directement. Les valeurs exactes de latence peuvent varier selon l’hôte, la version de Docker, Windows/WSL2 et la virtualisation; la propriété attendue est donc la reproduction des tendances et du raisonnement, pas l’égalité à la milliseconde près.
 
 ### 8.8. Règle d’interprétation
 
@@ -886,4 +942,10 @@ L’IA n’a pas constitué une source de preuve expérimentale. Les mesures pr�
 [7] Wohlin, C., Runeson, P., Höst, M., Ohlsson, M. C., Regnell, B., & Wesslén, A. (2012). *Experimentation in Software Engineering*. Springer. https://doi.org/10.1007/978-3-642-29044-2
 
 [8] Bass, L., Clements, P., & Kazman, R. (2021). *Software Architecture in Practice* (4th ed.). Addison-Wesley Professional. https://www.informit.com/store/software-architecture-in-practice-9780136886099
+
+[9] Kamiński, Ł., Kozłowski, M., Sporysz, D., Wolska, K., Zaniewski, P., & Roszczyk, R. (2023). “Comparative Review of Selected Internet Communication Protocols.” *Foundations of Computing and Decision Sciences*, 48(1), 39–56. https://doi.org/10.2478/fcds-2023-0003
+
+[10] Bolanowski, M., Żak, K., Paszkiewicz, A., Ganzha, M., Paprzycki, M., Sowiński, P., Lacalle, I., & Palau, C. E. (2022). “Eficiency of REST and gRPC Realizing Communication Tasks in Microservice-Based Ecosystems.” In *New Trends in Intelligent Software Methodologies, Tools and Techniques*, 97–108. https://doi.org/10.3233/FAIA220242
+
+[11] Brito, G., & Valente, M. T. (2020). “REST vs GraphQL: A Controlled Experiment.” In *2020 IEEE International Conference on Software Architecture (ICSA)*, 81–91. https://doi.org/10.1109/ICSA47634.2020.00016
 

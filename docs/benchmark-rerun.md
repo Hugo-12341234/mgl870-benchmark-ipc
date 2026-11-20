@@ -19,8 +19,10 @@ Après les dix exécutions, la même commande consolide les résultats et lance 
    ou autres charges importantes pendant toute la campagne.
 2. Brancher l’ordinateur et désactiver temporairement la mise en veille.
 3. Démarrer Docker Desktop et attendre que le moteur soit prêt.
-4. Ne pas modifier le code, les profils k6 ou les limites Docker entre les runs.
-5. Exécuter le pilote :
+4. Exécuter `cargo test` et confirmer que les contrats REST, GraphQL,
+   JSON-RPC et gRPC passent avant de construire les images.
+5. Ne pas modifier le code, les profils k6 ou les limites Docker entre les runs.
+6. Exécuter le pilote :
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tests\run_all_benchmarks.ps1 -Quick

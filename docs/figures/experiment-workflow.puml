@@ -11,6 +11,8 @@ skinparam defaultFontName Arial
 title "MGL870 — Workflow expérimental reproductible"
 
 start
+:Exécuter cargo test
+et valider les contrats;
 :Construire l’image Rust;
 :Créer le réseau Docker
 et les quatre serveurs;

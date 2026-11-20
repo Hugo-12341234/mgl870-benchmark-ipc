@@ -30,3 +30,39 @@ pub async fn serve(address: &str) -> Result<(), tonic::transport::Error> {
         .serve(address)
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        TickIngestion, TickIngestionService,
+        tick::{TickList, TickMessage},
+    };
+    use tonic::Request;
+
+    fn tick() -> TickMessage {
+        TickMessage {
+            symbol: "SHOP".to_owned(),
+            price: 115.42,
+            volume: 100,
+            timestamp: 1_700_000_000,
+        }
+    }
+
+    #[tokio::test]
+    async fn accepts_a_single_tick() {
+        let response = TickIngestionService.ingest_tick(Request::new(tick())).await;
+
+        assert!(response.is_ok());
+    }
+
+    #[tokio::test]
+    async fn accepts_a_tick_batch() {
+        let response = TickIngestionService
+            .ingest_tick_batch(Request::new(TickList {
+                ticks: vec![tick()],
+            }))
+            .await;
+
+        assert!(response.is_ok());
+    }
+}

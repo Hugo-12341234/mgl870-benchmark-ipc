@@ -1,4 +1,4 @@
-@startuml "MGL870 - Vue Composants"
+@startuml
 !theme plain
 skinparam backgroundColor #FFFFFF
 skinparam componentStyle uml2
@@ -16,6 +16,7 @@ title "MGL870 — Diagramme de Composants du Banc d’Essai"
 package "Clients de test" #E6F7FF {
   [Scénario unitaire\nload_test.js] as Single
   [Scénario batch\nload_test_batch.js] as Batch
+  [Orchestrateur k6\nprofils et tags] as K6Runner
 }
 
 package "Adaptateurs de protocole" #FFECB3 {
@@ -37,14 +38,12 @@ package "Observabilité" #E2FFCC {
   [Grafana\ndashboards] as Grafana
 }
 
-Single ..> Rest : requête Tick
-Single ..> Graphql : mutation
-Single ..> JsonRpc : méthode
-Single ..> Grpc : RPC
-Batch ..> Rest : tableau Tick
-Batch ..> Graphql : mutation batch
-Batch ..> JsonRpc : params Tick[]
-Batch ..> Grpc : TickList
+Single --> K6Runner : 1 tick
+Batch --> K6Runner : 500 ticks
+K6Runner ..> Rest : POST JSON
+K6Runner ..> Graphql : mutation + variables
+K6Runner ..> JsonRpc : méthode + params
+K6Runner ..> Grpc : RPC Protobuf
 
 Rest --> TickContract
 Graphql --> TickContract
@@ -52,21 +51,21 @@ JsonRpc --> TickContract
 Grpc --> TickContract
 TickContract --> Processing
 
-Single ..> K6Metrics
-Batch ..> K6Metrics
+K6Runner ..> K6Metrics : mesures taguées
 ContainerMetrics --> Prometheus
 K6Metrics --> Prometheus
 Prometheus --> Grafana
 
-note bottom of Processing
-Traitement identique pour les quatre variantes :
-désérialisation en mémoire puis réponse de succès.
+note bottom of K6Runner
+Les deux profils construisent les mêmes valeurs de tick;
+seules la taille du lot et l’interface appelée varient.
 end note
 
 legend right
 Les adaptateurs isolent les différences de transport,
 d’interface et de sérialisation. Le contrat expérimental
-et le traitement commun restent volontairement minimaux.
+et le traitement commun restent volontairement minimaux :
+désérialisation en mémoire puis réponse de succès.
 endlegend
 
 @enduml
