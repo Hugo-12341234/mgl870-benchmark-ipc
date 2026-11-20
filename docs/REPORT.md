@@ -683,9 +683,9 @@ REST bénéficie d’une opérabilité élevée dans le contexte général de l�
 
 JSON-RPC conserve une grande partie de cette lisibilité tout en exprimant explicitement une opération et ses paramètres. Son enveloppe ajoute de la structure et un contrat de méthode, mais les messages restent inspectables comme JSON. Il constitue ainsi un compromis entre le modèle orienté ressource de REST et un appel de procédure plus explicite.
 
-GraphQL dispose d’un écosystème d’outils riche, mais l’observation d’une requête demande de comprendre le schéma, la mutation, les variables et le chemin d’exécution du résolveur. Cette complexité peut être justifiée lorsqu’elle permet aux clients de contrôler précisément les données demandées. Dans le scénario d’ingestion fixe étudié ici, cette flexibilité apporte peu de valeur et son coût d’exécution devient visible dans les résultats batch.
+GraphQL dispose d’un écosystème d’outils riche, mais l’observation d’une requête demande de comprendre le schéma, la mutation, les variables et le chemin d’exécution du résolveur. L’expérience contrôlée de Brito et Valente montre que cet outillage et ces abstractions peuvent réduire l’effort de développement pour certaines requêtes complexes [11]. Cette complexité peut donc être justifiée lorsqu’elle permet aux clients de contrôler précisément les données demandées. Dans le scénario d’ingestion fixe étudié ici, cette flexibilité apporte peu de valeur et son coût d’exécution devient visible dans les résultats batch.
 
-gRPC apporte des outils spécialisés, la génération de code et un contrat de service explicite, mais le trafic binaire n’est pas immédiatement lisible dans un proxy ou un journal HTTP ordinaire. L’équipe doit disposer d’outils capables de charger le contrat `.proto`, d’interpréter les messages et de comprendre HTTP/2. La documentation officielle de gRPC décrit ces mécanismes et leurs outils [4]; elle soutient l’analyse de cette dépendance à une chaîne d’outillage spécialisée, sans fournir une mesure du coût opérationnel dans l’organisation étudiée.
+gRPC apporte des outils spécialisés, la génération de code et un contrat de service explicite, mais le trafic binaire n’est pas immédiatement lisible dans un proxy ou un journal HTTP ordinaire. L’équipe doit disposer d’outils capables de charger le contrat `.proto`, d’interpréter les messages et de comprendre HTTP/2. La documentation officielle présente notamment `grpcdebug`, Channelz et les services d’administration permettant d’inspecter l’état interne des canaux et des services [12]. Ces mécanismes rendent gRPC observable, mais demandent une instrumentation et des compétences propres à son écosystème. Les documentations officielles soutiennent donc l’analyse de cette chaîne d’outillage spécialisée [4], [12], sans fournir une mesure de son coût dans l’organisation étudiée.
 
 ### 11.3. Flexibilité contre coût de traitement
 
@@ -697,11 +697,11 @@ REST offre une interface plus explicite et moins dynamique pour le scénario ret
 
 Le couplage contractuel décrit ici la dépendance entre le client et le serveur pour comprendre, générer et faire évoluer l’interface. Il ne faut pas confondre couplage fort avec mauvaise architecture : un contrat explicite peut réduire les ambiguïtés et détecter des incompatibilités avant l’exécution. En contrepartie, il exige une gouvernance de versionnement et une coordination plus rigoureuse.
 
-Avec gRPC, le fichier `.proto` constitue une source contractuelle partagée. La génération de code améliore la cohérence des types et rend les opérations disponibles plus explicites, mais une évolution du contrat doit respecter les règles de compatibilité de Protocol Buffers et être propagée aux consommateurs concernés [5]. Le couplage est donc visible et outillé, mais il devient une responsabilité architecturale à gérer.
+Avec gRPC, le fichier `.proto` constitue une source contractuelle partagée. La génération de code améliore la cohérence des types et rend les opérations disponibles plus explicites, mais une évolution du contrat doit respecter les règles de compatibilité de Protocol Buffers et être propagée aux consommateurs concernés [5]. Les bonnes pratiques officielles interdisent notamment de réutiliser le numéro d’un champ supprimé et recommandent de réserver les numéros et noms retirés afin de protéger les anciens messages et consommateurs [13]. Le couplage est donc visible et outillé, mais il devient une responsabilité architecturale à gérer.
 
 REST peut aussi être couplé à un schéma ou à des conventions, mais son format JSON et ses outils génériques permettent souvent une évolution plus tolérante au niveau de la représentation. Cette souplesse peut réduire la coordination initiale, mais elle peut aussi déplacer les erreurs vers l’exécution lorsque le contrat est implicite ou insuffisamment documenté. JSON-RPC se trouve entre les deux : les noms de méthodes et les paramètres forment un contrat, mais la représentation demeure dynamique et textuelle.
 
-GraphQL centralise une partie du contrat dans le schéma. Le schéma explicite les opérations et les types, tout en permettant des requêtes variables à l’intérieur de cet espace. Il réduit certains problèmes de sur- ou sous-récupération, mais introduit une gouvernance du schéma et des enjeux de compatibilité liés à l’évolution des champs et des résolveurs.
+GraphQL centralise une partie du contrat dans le schéma. Le schéma explicite les opérations et les types, tout en permettant des requêtes variables à l’intérieur de cet espace. Son modèle d’évolution favorise les ajouts compatibles et la dépréciation progressive avec `@deprecated`; la suppression d’un champ exige néanmoins de suivre son utilisation et de coordonner la migration des clients [14]. GraphQL réduit ainsi certains problèmes de sur- ou sous-récupération, mais introduit une gouvernance explicite du schéma et des enjeux de compatibilité liés à l’évolution des champs et des résolveurs.
 
 ### 11.5. Matrice qualitative des compromis
 
@@ -948,4 +948,10 @@ L’IA n’a pas constitué une source de preuve expérimentale. Les mesures pr�
 [10] Bolanowski, M., Żak, K., Paszkiewicz, A., Ganzha, M., Paprzycki, M., Sowiński, P., Lacalle, I., & Palau, C. E. (2022). “Eficiency of REST and gRPC Realizing Communication Tasks in Microservice-Based Ecosystems.” In *New Trends in Intelligent Software Methodologies, Tools and Techniques*, 97–108. https://doi.org/10.3233/FAIA220242
 
 [11] Brito, G., & Valente, M. T. (2020). “REST vs GraphQL: A Controlled Experiment.” In *2020 IEEE International Conference on Software Architecture (ICSA)*, 81–91. https://doi.org/10.1109/ICSA47634.2020.00016
+
+[12] gRPC Authors. (2024). *Debugging*. Documentation officielle de gRPC. Consulté le 20 novembre 2026. https://grpc.io/docs/guides/debugging/
+
+[13] Protocol Buffers Authors. (s. d.). *Proto Best Practices*. Documentation officielle de Protocol Buffers. Consulté le 20 novembre 2026. https://protobuf.dev/best-practices/dos-donts/
+
+[14] GraphQL Foundation. (s. d.). *Schema Change Management*. Documentation officielle de GraphQL. Consulté le 20 novembre 2026. https://www.graphql.org/learn/governance-versioning/
 
